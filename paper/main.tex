@@ -29,11 +29,11 @@
 
 \vspace{0.4cm}
 
-\noindent{\bfseries 摘\quad 要：}无人机在城市里送货，最怕撞上楼。它通常只装一个摄像头，前面的距离要靠算法推算，算错了就会出问题。本文做两件事：先训练这样一个算法，量出它在什么地方准、什么地方不准；再讨论算不准的时候，地面站的界面应该怎么设计，才能让人及时发现问题。
+\noindent{\bfseries 摘\quad 要：}低空物流的配送飞行器需要持续判断前方障碍的距离。头部机型采用多传感器融合，但融合降低出错概率而未消除出错；成本敏感的下沉航线与融合系统的降级形态则依赖单目视觉，其距离只能由算法推断。
 
-研究在仿真城市环境中采集 22 趟飞行共 2512 帧图像，对比了五种视觉模型的判断效果。表现最好的一种，深度判断的 $\delta_1$ 指标达到 0.895。分层分析发现一个与常识相反的现象：距离越远反而越准，10 至 20 米这一段表现最差，有 32\% 的画面判断严重偏离。
+本文在城市峡谷仿真环境中采集 22 趟飞行共 2512 帧图像与稠密深度真值，固定解码器与训练预算，比较五种视觉表征，并对误差作分层分析。ImageNet 预训练骨干的验证集 $\delta_1$ 达到 0.895，为五者最优。分层结果与常识相反：误差随距离增大而减小，40 米以上 $\delta_1$ 为 0.81，10 至 20 米仅 0.71，该区间有 32\% 的帧严重偏离。
 
-这个发现对界面设计有直接含义。既然系统在特定区间明显不可靠，界面就不能在任何情况下都给出同样确定的结论。本文据此从设计学角度分析了现有界面的问题，指出三条未被满足的设计原则，并进一步提出一个让系统越用越准的机制：管理者的每一次复核判断，都可以转化为下一版模型的训练数据。
+上述分布对人机协作有直接含义。既然系统在特定区间显著不可靠，界面就不应在任何条件下以同等确定性呈现结论。本文据此从设计学角度分析现有地面站的信息编码，指出三条未被满足的设计原则，并提出人在回路的改进机制：管理者的复核判断经溯源、评判与聚合三个环节，可转化为下一版模型的训练数据。
 
 \vspace{0.3cm}
 \noindent{\bfseries 关键词：}设计+AI；人机交互；无人机；单目深度估计；低空物流
@@ -48,11 +48,11 @@ for Delivery Drones}\\[4pt]
 
 \vspace{0.3cm}
 
-\noindent{\bfseries Abstract:} Delivery drones in cities face one dominant risk: hitting a building. Most carry a single camera, so range must be inferred by an algorithm, and the algorithm errs. This paper does two things. First, we train such an algorithm and measure where it is accurate and where it is not. Second, we discuss how a ground station interface should be designed so that operators notice failures in time.
+\noindent{\bfseries Abstract:} Delivery aircraft in low-altitude logistics must continuously estimate the distance to obstacles ahead. Leading platforms adopt multi-sensor fusion, which reduces but does not eliminate error; cost-sensitive routes and degraded fusion configurations rely on monocular vision, where range can only be inferred by an algorithm.
 
-Using 2512 frames from 22 flights in a simulated urban environment, we compare five visual backbones. The best reaches a depth $\delta_1$ of 0.895. A stratified analysis reveals a counter-intuitive pattern: accuracy improves with distance, and the 10 to 20 metre band is the worst, with 32\% of frames severely off.
+We collect 2512 frames with dense depth ground truth from 22 flights in a simulated urban canyon, fix the decoder and training budget, compare five visual representations, and analyse the error in layers. An ImageNet-pretrained backbone reaches a validation $\delta_1$ of 0.895, the best of the five. The stratified result runs counter to intuition: accuracy improves with distance, with $\delta_1$ of 0.81 beyond 40 m but only 0.71 between 10 and 20 m, where 32\% of frames deviate severely.
 
-This finding has a direct design implication. If the system is markedly unreliable in a specific range, an interface should not present every verdict with equal certainty. We therefore design a three-column ground station interface, and propose a mechanism that lets the system improve with use: each operator review becomes training data for the next model.
+This distribution has a direct implication for human-machine collaboration. If the system is markedly unreliable within a specific range, an interface should not present every verdict with equal certainty. We therefore analyse the information encoding of existing ground stations from a design perspective, identify three unsatisfied design principles, and propose a human-in-the-loop mechanism in which operator reviews, through provenance, judgement and aggregation, become training data for the next model.
 
 \vspace{0.3cm}
 \noindent{\bfseries Keywords:} design and AI; human-computer interaction; UAV; monocular depth estimation; low-altitude logistics
