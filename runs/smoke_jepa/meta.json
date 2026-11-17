@@ -1,0 +1,25 @@
+{
+ "cfg": {
+  "model": {
+   "patch": 16,
+   "dim": 96,
+   "depth": 2,
+   "heads": 4,
+   "mlp_ratio": 4,
+   "in_ch": 3,
+   "pred_depth": 4,
+   "ema_tau": 0.996,
+   "vicreg_var": 0.04,
+   "vicreg_cov": 0.01,
+   "vicreg_tvar": 0.01,
+   "pred_metric": "l1"
+  },
+  "data": {
+   "img_h": 64,
+   "img_w": 64
+  }
+ },
+ "runs": "all",
+ "pairs": 6,
+ "steps": 3
+}

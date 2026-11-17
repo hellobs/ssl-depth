@@ -1,0 +1,25 @@
+# 模型权重与训练产物（体积大，可用脚本重跑）
+*.pt
+*.pth
+*.ckpt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# LaTeX 中间文件（pdf 保留）
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+
+# 系统
+Thumbs.db
+.DS_Store
+
+# 打包产物与临时文件
+*.zip
+runs/_peek/
