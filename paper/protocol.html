@@ -54,11 +54,13 @@ function boot() { renderWelcome(); }   // 真值已内联，file:// 下无需 fe
 
 function renderWelcome() {
   app.innerHTML = `
-    <h1>无人机感知界面可读性测试</h1>
+    <h1>无人机异常复核界面测试</h1>
     <p>你会看到 60 张无人机前视画面，界面样式有三种，随机出现。</p>
-    <p>任务：判断<b>此刻飞机前方是否有危险</b>，即障碍物是否可能撞上。<br>
+    <p>情境：某架配送无人机因检测到前方障碍，<b>已自动悬停</b>。你作为地面调度员，
+       要判断这一次悬停是否合理。</p>
+    <p>任务：若前方真有障碍，应<b>维持悬停</b>；若前方通畅、属于误检，应<b>解除悬停</b>。<br>
        不用纠结边界情况，凭第一印象快速判断。</p>
-    <p>用键盘 <b>←</b> 表示有危险，<b>→</b> 表示安全，也可以点按钮。</p>
+    <p>用键盘 <b>←</b> 维持悬停，<b>→</b> 解除悬停，也可以点按钮。</p>
     <p style="margin-top:20px">请输入你的编号（如 S01）</p>
     <input id="sid" style="padding:12px;width:160px;text-align:center;font-size:16px;
            background:#1b1e26;border:1px solid #2c313c;border-radius:6px;color:#e8ecf2">
@@ -78,8 +80,8 @@ function next() {
       <div id="bar"><i style="width:${100*idx/TRIALS.length}%"></i></div>
       <img src="${t.file}" alt="">
       <div class="btns">
-        <button id="danger">有危险 ←</button>
-        <button id="safe">安全 →</button>
+        <button id="danger">维持悬停 ←</button>
+        <button id="safe">解除悬停 →</button>
       </div>
       <div class="hint">${idx+1} / ${TRIALS.length}</div>`;
     locked = false;
@@ -120,7 +122,7 @@ function finish() {
   const lines = Object.entries(byVer).sort().map(([v, d]) => {
     const acc = (100 * d.ok / d.n).toFixed(1);
     const rt = Math.round(d.rt.reduce((a, b) => a + b, 0) / d.rt.length);
-    return `方案 ${v}：正确率 ${acc}%　平均反应 ${rt} ms`;
+    return `模式 ${v}：正确率 ${acc}%　平均反应 ${rt} ms`;
   }).join("<br>");
 
   const csv = "subject,version,frame,choice,rt_ms\n" +
