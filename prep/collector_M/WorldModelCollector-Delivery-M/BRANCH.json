@@ -1,0 +1,23 @@
+{
+  "branch_kind": "directory_fork",
+  "created_local_date": "2026-11-16",
+  "base_directory": "D:/MetaEvo/UE4/AirSim-CityEnviron-UE4/WorldModelCollector",
+  "base_schema": "airsim-world-model.v7-timed-episodes",
+  "schema": "airsim-delivery-m.v1",
+  "base_files_sha256": {
+    "scripts\\world_model_record.py": "e34e15c5222ff2bf0abe3867bf109359bbe9956724a796890912d9ef334226fa",
+    "scripts\\world_model_path.py": "934115444f5479994161587f10bec67f08ae8e926b46b441273febcd3ae33fa5",
+    "scripts\\world_model_session.py": "5863c5fdc123bcd48dea7d88a43f26c12008eb05f86c97f41f0512fbac819364",
+    "scripts\\check_conn.py": "eddda4d14ffa025464096983a86adba136445c1bd040e2ad07528af14a54ec92",
+    "config\\wm_settings.json": "da2f3d7ab838f612efb16fa8b1c4af035aae8ed3d98d744dd50524f44741462b",
+    "scripts\\collect_world_model.py": "ee11a576bd37329cd84bc0a9d11f9d9d9c40388785fd73ee7313c272ac0f55a4"
+  },
+  "changes": [
+    "primitive velocity actions",
+    "paused simulation step handshake",
+    "goal-conditioned delivery measurements",
+    "deferred reward reconstruction",
+    "float32 depth and per-observation camera poses"
+  ]
+}
+
