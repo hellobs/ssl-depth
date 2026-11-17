@@ -73,7 +73,7 @@
 
 \noindent{\bfseries 摘\quad 要：}无人机在城市楼宇间配送时只有一枚摄像头，前后距离必须由算法估计，而算法会出错。更麻烦的是，它出错时地面看屏幕的人察觉不到，界面上只有一条飞行轨迹。
 
-本文训练单目深度估计模型并测出其在仿真城市飞行数据上的准确度，其中 ImageNet 预训练骨干的验证集 $\delta_1$ 达到 0.86，但在玻璃幕墙与远景结构画面上仍会误判。针对这一失效模式，设计三种信息密度不同的界面，分别只给画面、叠加距离分区、直接给出结论，并让非专业被试完成限时危险判断，记录正确率、反应时间，以及模型出错时被试是否跟着出错。
+本文训练单目深度估计模型并测出其在仿真城市飞行数据上的准确度，其中 ImageNet 预训练骨干的验证集 $\delta_1$ 达到 0.86，但在玻璃幕墙与远景结构画面上仍会误判。针对这一失效模式，设计一套地面站界面：左栏机队列表按风险排序，中栏主视图提供三种信息密度的呈现模式，右栏把模型判断、测量值、置信度与操作分区陈列。测试让非专业被试在系统已触发悬停的场景下判断是否应当解除，记录判断正确率、反应时间，以及模型出错时被试是否跟着出错。
 
 这套方案用于检验一个假设：界面若只复述模型结论，人会在模型出错时一起出错；保留可解读的中间信息，才能让人察觉异常。
 
@@ -92,7 +92,7 @@ Logistics Drones}\\[4pt]
 
 \noindent{\bfseries Abstract:} A delivery drone threading through urban canyons carries a single camera, so range must be inferred by an algorithm, and the algorithm errs. Worse, when it errs the person watching the screen cannot tell, because the interface shows only a flight path.
 
-We train a monocular depth model and measure its accuracy on simulated urban flight data. The variant with an ImageNet-pretrained backbone reaches a validation $\delta_1$ of 0.86, yet still misjudges frames dominated by glass facades and distant structures. Against this failure mode we design three interfaces of differing information density: image only, zoned distance colouring, and an explicit verdict. Non-expert participants then perform a timed risk judgement, and we record accuracy, response time, and whether they follow the model into error.
+We train a monocular depth model and measure its accuracy on simulated urban flight data. The variant with an ImageNet-pretrained backbone reaches a validation $\delta_1$ of 0.86, yet still misjudges frames dominated by glass facades and distant structures. Against this failure mode we design a ground station interface: a risk-ranked fleet list on the left, a main view offering three presentation modes of differing information density, and a right panel that separates model verdict, measurements, confidence and actions. Non-expert participants judge whether a system-triggered hover should be released, and we record accuracy, response time, and whether they follow the model into error.
 
 The protocol tests a single hypothesis: an interface that merely repeats the model's verdict will lead the operator into the same errors, whereas retaining interpretable intermediate information lets them notice when something is wrong.
 
@@ -106,9 +106,13 @@ The protocol tests a single hypothesis: an interface that merely repeats the mod
 
 低空经济正在从试点走向常态运营，城市内部的无人机配送、巡检与应急投送都已经出现固定航线。这门生意的安全底线很简单：不要撞楼。而撞楼之前一定有一个瞬间，飞机离障碍物已经近到无法挽回，而系统没有做出正确反应。
 
-在有人驾驶的航空里，这个环节由飞行员的眼睛和仪表共同承担。无人机的方案通常是三选一：激光雷达、双目视觉、单目视觉加算法。前两者精度高，但重量和成本对多旋翼的续航是硬约束，微型配送机往往带不动。单目相机几乎零成本，代价是距离必须由算法推断，而算法会错。
+城市配送的无人机没有飞行员。它自主起飞、自主巡航、自主避障，地面上一个人同时管几十架。这个人平时不看画面，只看告警，只有当某架飞机做出异常动作时才会被叫进来：突然悬停、偏离航线、返航，或者干脆失联。
 
-一个被反复忽略的事实是，算法出错时，地面的人是不知道的。现有地面站的界面设计基本沿用了十年前的做法：地图上一个点，旁边几个数字，再加一路视频。这套界面的信息结构假设操作员只需要知道飞机在哪、还剩多少电。它没有为模型的判断留位置，更没有为模型的失误留位置。
+也就是说，人介入的时刻不在飞行过程中，而在系统已经做出决定之后。他要回答的问题不是前面有没有楼，而是系统刚才那个决定对不对，要不要解除。这个复核窗口通常只有几十秒。
+
+问题在于，现有地面站只告诉他发生了什么，不告诉他为什么。界面上是一条轨迹、一个状态、几项参数，没有模型判断的依据，也没有这次判断到底有多大把握。当飞控因为一次误检而悬停，调度员看到的和真实危险时一模一样，他没有任何依据去区分这两种情况。
+
+现有地面站的信息结构基本沿用了十年前的做法：地图上一个点，旁边几个数字，再加一路视频。这套设计假设操作员只需要知道飞机在哪、还剩多少电。它没有为模型的判断留位置，更没有为模型的失误留位置。
 
 这构成了一个设计问题，而不是一个算法问题。算法的目标是把误差降到最低，设计的目标是让误差在发生的时候可以被察觉、被纠正。两者不能互相替代。一个误差 3 米的模型配上一个诚实表达不确定的界面，可能比一个误差 1 米但界面装作什么都知道的系统更安全。
 
@@ -144,6 +148,20 @@ The protocol tests a single hypothesis: an interface that merely repeats the mod
 
 现有地面站的界面设计可以参考消费级无人机的遥控软件：以第一视角视频为主体，叠加高度、速度、电量、卫星数等参数，危险提示以弹窗或语音形式出现。这套设计的假设是操作员具备飞行经验，能自行从画面判断风险。而对于坐在调度中心、同时看十几路画面的非专业操作员，这个假设不成立。
 
+\subsection{技术路线的商业约束}
+
+一个自然的质疑是：既然单目测距会出错，为什么不直接装激光雷达。
+
+技术上没有障碍，商业上有三道账。
+
+第一道是重量。城市配送多旋翼的载重普遍在 2 至 5 公斤量级，一次飞行带几票货是算得清的。一套中近距离激光雷达连同支架、线束与散热，通常在数百克量级，等于每趟少带一票，或者续航缩短一到两成。
+
+第二道是成本。激光雷达的单价是视觉模组的数十倍，而配送机属于消耗品，摔机、折旧、批量投放都会把这个倍数放大。对一个靠单票毛利取胜的行业，这是结构性成本，不是可以摊薄的采购价差。
+
+第三道更隐蔽：即便装了激光雷达，界面问题也不会消失。激光雷达在雨雾、玻璃幕墙、镜面反射、强逆光下同样会出现无效回波与误检，而且它的失效比相机更难被人直觉理解。调度员面对一串点云，仍然需要有人告诉他这一次的读数可不可信。
+
+所以本文的立场不是单目优于激光雷达，而是：在只能用单目的机型上，如何让算法的不可靠变得可被察觉。前者是器件选型，后者是界面设计，二者并不冲突。若机型允许加装雷达，本文的界面结构与判据同样适用，只是失效模式换了一套。
+
 \section{项目设计}
 
 \subsection{项目情境}
@@ -152,9 +170,13 @@ The protocol tests a single hypothesis: an interface that merely repeats the mod
 
 某低空物流企业在市中心商务区运营楼宇间配送航线。区域建筑高度 30 至 90 米，街道净宽 20 至 40 米，航线高度 30 米，巡航速度 8 米每秒。机型为控制重量只装一枚前视单目相机，不配激光雷达与双目模组。
 
-地面设调度中心，一名调度员同时监控 12 架飞机。他的日常工作不是操纵飞机，而是在异常发生时决定是否介入。介入手段有三种：让飞机减速、重规划航线、切换人工接管。
+地面设调度中心，一名调度员同时监控 12 架飞机。他不操纵飞机，飞控自己飞。他的工作只有一个：当某架飞机做出异常动作时，判断这次动作是否合理，决定放行还是接管。
 
-系统设定一条安全判据：机头正前方 9 米以内出现障碍时，应当触发悬停。9 米来自 8 米每秒的巡航速度与约 1 秒的总响应延迟。判断错误的代价不对称，漏判可能导致撞机，误判只是多停一次、损失几秒配送时间。
+系统设定一条安全判据：机头正前方 9 米以内出现障碍时，飞控应当自动触发悬停。9 米来自 8 米每秒的巡航速度与约 1 秒的总响应延迟。
+
+这条判据在两个方向上都会出错。漏判是前方真有障碍而系统没有悬停，后果是撞机。误判是前方没有障碍而系统悬停，后果是一票货延误、整条航线拥堵，并且占用调度员的注意力。两者的代价不对称，但都不是零成本：误判率过高会让调度员对告警脱敏，真正危险的那一次反而被忽略。
+
+调度员被叫进来时，飞机通常已经停住了。他要在三十秒内看清画面、理解系统为什么停、判断这一次该不该解除。界面要支持的就是这三十秒。
 
 \subsection{项目目标}
 
@@ -216,7 +238,7 @@ JEPA 自监督 & 航拍图像 & 0.579 & 0.381 \\
 
 这两个失败模式直接决定了界面设计的方向。既然模型会在特定画面上出错，界面就不应该在任何情况下都表现得同样笃定。它需要有一种方式，让人看出这一次的结论是不是可以相信。
 
-\section{界面设计}
+\section{地面站界面设计}
 
 \subsection{设计问题}
 
@@ -226,9 +248,26 @@ JEPA 自监督 & 航拍图像 & 0.579 & 0.381 \\
 
 现有地面站的处理方式是给数字，把转换的责任完全推给人。这在操作员是专业飞手时可行，在调度员同时看 12 路画面时不可行，因为读数字、比对阈值、形成判断需要认知资源，而这个资源在监控多路时是稀缺的。
 
-\subsection{三版方案}
+\subsection{信息架构}
 
-围绕信息量这一个变量，设计三版方案。三版使用完全相同的画面素材与相同的判据，差别只在呈现。
+一名调度员同时监控 12 架飞机，界面必须回答三个问题：谁有事、有什么事、要不要现在动。据此把屏幕分成三栏。
+
+\textbf{左栏是机队列表}，每架一行，给出编号、状态、前方距离与电量，按风险排序。这里用列表而不用地图，理由是调度员的注意力被异常吸引，他需要的是排序而不是空间位置。地图适合单机导航，不适合多机分诊。
+
+\textbf{中栏是主视图}，只显示当前选中那一架的画面。同时铺开十二路视频在认知上不可行，也会稀释注意力，让每一路都看不清。
+
+\textbf{右栏是详情}，分四块：系统判断、测量值、模型置信度、操作按钮。把置信度单列一块而不是塞进判断里，是本文的核心主张。置信度不是附属信息，它决定了这条判断能不能被单独采信。界面用一句话说明置信度的含义，例如距离远离阈值时判断稳定，紧贴阈值时此判断不可单独作为依据。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figs/console.png}
+\caption{地面站原型界面。左栏为机队列表，中栏为主视图，右栏自上而下为系统判断、测量值、模型置信度与操作按钮。顶栏汇总在线数量与告警计数。}
+\label{fig:console}
+\end{figure}
+
+\subsection{三种呈现模式}
+
+中栏的主视图提供三种模式，对应三种信息密度。三版使用完全相同的画面素材与相同的判据，差别只在呈现。
 
 \paragraph{A 版\quad 裸画面（基线）}
 只显示前视画面，不给任何模型信息。这一版代表没有智能辅助时人的自然能力，作为对照基准。它的价值在于测出一个前提：人靠肉眼看单目画面，究竟能不能判断前方距离。
@@ -241,15 +280,32 @@ JEPA 自监督 & 航拍图像 & 0.579 & 0.381 \\
 
 三版的信息量递增，人的认知负荷递减，但对模型的依赖递增。这个此消彼长的关系是本次设计的核心张力。
 
-\subsection{方案对照}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.32\textwidth]{stimuli/sq/f14_A.png}\hfill
+\includegraphics[width=0.32\textwidth]{stimuli/sq/f14_B.png}\hfill
+\includegraphics[width=0.32\textwidth]{stimuli/sq/f14_C.png}
+\caption{同一帧画面的三种呈现模式。左为 A 版裸画面，中为 B 版分区着色，右为 C 版结论式。}
+\label{fig:three}
+\end{figure}
+
+\subsection{状态与告警}
+
+系统定义四级状态：正常、注意、危险、失联。颜色不单独承载信息，同一时刻同步改变主视图边框、列表项色标与顶栏计数三处，避免色觉障碍用户丢失关键信息。
+
+危险状态除了变色，还会把该机顶到列表首位并触发顶栏告警计数。失联状态整行降低不透明度，文案改为信号中断，同时把可用的操作按钮减为只保留重规划，因为无画面时无法判断悬停是否安全。
+
+\subsection{交互与操作}
+
+点击左栏任意一架即切换主视图。顶部三个按钮切换呈现模式。右栏底部三个操作按后果严重程度自上而下排列：立即悬停用实心红底并绑定快捷键 H，减速至 3 米每秒为次要操作，重规划航线为常规操作。
 
 \begin{table}[htbp]
 \centering
-\caption{三版方案的信息结构与预期效果}
+\caption{三版呈现模式的信息结构与预期效果}
 \label{tab:schemes}
 \begin{tabular}{p{2.2cm}p{2.6cm}p{2.4cm}p{3.4cm}p{3.4cm}}
 \toprule
-方案 & 给出的信息 & 人的角色 & 预期优势 & 预期风险 \\
+模式 & 给出的信息 & 人的角色 & 预期优势 & 预期风险 \\
 \midrule
 A 裸画面 & 仅画面 & 完全自主判断 & 不受模型错误影响 & 慢，且非专业者判断力弱 \\
 B 分区着色 & 画面加距离分区 & 半自主，自行解读 & 兼顾速度与独立判断 & 需要读图例，有学习成本 \\
@@ -258,36 +314,29 @@ C 结论式 & 画面加结论 & 依赖模型 & 最快最省力 & 模型错时跟
 \end{tabular}
 \end{table}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.32\textwidth]{stimuli/f14_A.png}\hfill
-\includegraphics[width=0.32\textwidth]{stimuli/f14_B.png}\hfill
-\includegraphics[width=0.32\textwidth]{stimuli/f14_C.png}
-\caption{同一帧画面的三种呈现。左为 A 版裸画面，中为 B 版分区着色，右为 C 版结论式。三版使用同一素材与同一判据，差别只在信息密度。}
-\label{fig:three}
-\end{figure}
-
 \section{用户测试}
 
 \subsection{被试与任务}
 
-被试为在校学生，非飞行相关专业，无无人机操作经验。计划招募 10 人，采用被试内设计，每人都完成三种方案的全部试次。
+被试为在校学生，非飞行相关专业，无无人机操作经验。计划招募 10 人，采用被试内设计，每人都完成三种模式的全部试次。
 
-测试材料为 20 帧画面，其中 10 帧真值距离小于 9 米（应判危险），10 帧大于 60 米（应判安全）。20 帧画面在两端的分布刻意拉开，避免边界样本带来的噪声，先测出方案之间的最大差异，再在后续版本中引入边界样本。
+情境设定为复核任务：屏幕提示某架飞机已因前方障碍自动悬停，被试看到的是那一帧的前视画面，需要判断应当解除悬停让飞机继续，还是维持悬停等待处理。
 
-20 帧乘以 3 版共 60 个试次，随机顺序呈现。被试的任务是在画面出现后尽快判断前方是否存在碰撞危险，用键盘左右方向键作答，程序记录选择与反应时。
+测试材料为 20 帧画面，其中 10 帧真值距离小于 9 米，属于应当维持悬停；10 帧大于 60 米，属于系统误检、应当解除。20 帧在两端刻意拉开，避免边界样本带来的噪声，先测出三种模式之间的最大差异，再在后续版本中引入边界样本。
+
+20 帧乘以 3 种模式共 60 个试次，随机顺序呈现。被试在画面出现后尽快用键盘左右方向键作答，左为维持悬停，右为解除。程序记录选择与反应时。
 
 \subsection{指标}
 
-三项指标。第一是判断正确率，与真值比较。第二是反应时间，从画面加载完成到按键。第三是抗误导能力，在模型判断与真值不一致的子集上，统计被试跟随模型出错的比例。
+三项指标。第一是判断正确率，与真值比较，即该维持悬停时是否维持、该解除时是否解除。第二是反应时间，从画面加载完成到按键。第三是抗误导能力，在模型判断与真值不一致的子集上，统计被试跟随模型出错的比例。
 
 第三项是本次设计最关心的指标。它直接回答一个问题：界面的笃定程度，会不会让人放弃自己的判断。
 
 \subsection{预期与记录}
 
-预期 C 版在模型判断正确的帧上最快最准，在模型判断错误的帧上错误率最高。B 版应居中。A 版最慢，但在模型出错的帧上不受影响。
+预期 C 模式在模型判断正确的帧上最快最准，在模型判断错误的帧上错误率最高。B 模式应居中。A 模式最慢，但在模型出错的帧上不受影响。
 
-若该预期成立，设计结论是：结论式界面适合模型置信度高的场景，分区着色适合置信度不明或人需要在环的场景，二者应当在同一套系统中按置信度切换，而不是二选一。
+若该预期成立，设计结论是：结论式呈现适合模型置信度高的场景，分区着色适合置信度不明或人需要在环的场景，二者应当在同一套系统中按置信度切换，而不是二选一。
 
 \begin{table}[htbp]
 \centering
