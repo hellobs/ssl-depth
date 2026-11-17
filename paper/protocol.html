@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>无人机感知界面可读性测试</title>
+<style>
+  :root { --bg:#12141a; --fg:#e8ecf2; --accent:#c0392b; --ok:#2e8b57; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+         display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .wrap { width:min(92vw,560px); text-align:center; }
+  h1 { font-size:22px; font-weight:600; margin:0 0 14px; }
+  p  { font-size:15px; line-height:1.7; color:#b6bfcc; margin:8px 0; }
+  img { width:100%; border-radius:8px; display:block; }
+  .btns { display:flex; gap:14px; margin-top:18px; }
+  button { flex:1; padding:18px 0; font-size:19px; border:0; border-radius:8px;
+           cursor:pointer; font-family:inherit; font-weight:600; color:#fff; }
+  #danger { background:var(--accent); }
+  #safe   { background:var(--ok); }
+  button:disabled { opacity:.4; cursor:default; }
+  .hint { font-size:13px; color:#79828f; margin-top:12px; }
+  #bar { height:4px; background:#242832; border-radius:2px; overflow:hidden; margin-bottom:16px; }
+  #bar > i { display:block; height:100%; width:0; background:#4a90d9; transition:width .2s; }
+  textarea { width:100%; height:180px; background:#1b1e26; color:#cfd6e0;
+             border:1px solid #2c313c; border-radius:6px; font-size:12px; padding:10px; }
+  #start { background:#4a90d9; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const TRUTH = {"0": "danger", "1": "danger", "2": "danger", "3": "danger", "4": "danger", "5": "danger", "6": "danger", "7": "danger", "8": "danger", "9": "danger", "10": "safe", "11": "safe", "12": "safe", "13": "safe", "14": "safe", "15": "safe", "16": "safe", "17": "safe", "18": "safe", "19": "safe"};
+const GTNEAR = {"0": 0.65, "1": 0.68, "2": 1.04, "3": 1.28, "4": 1.54, "5": 1.97, "6": 2.12, "7": 2.64, "8": 2.66, "9": 3.25, "10": 71.75, "11": 71.75, "12": 71.69, "13": 71.69, "14": 71.68, "15": 71.31, "16": 70.5, "17": 70.0, "18": 69.44, "19": 68.94};
+const VERSIONS = ["A", "B", "C"];
+const NFRAME = 20;
+const TRIALS = (() => {
+  const t = [];
+  for (const v of VERSIONS) for (let i = 0; i < NFRAME; i++)
+    t.push({ ver: v, frame: String(i).padStart(2, "0"),
+             file: `stimuli/f${String(i).padStart(2,"0")}_${v}.png` });
+  for (let i = t.length - 1; i > 0; i--) {          // 洗牌
+    const j = Math.floor(Math.random() * (i + 1));
+    [t[i], t[j]] = [t[j], t[i]];
+  }
+  return t;
+})();
+
+let manifest = null, subj = "", idx = 0, t0 = 0, recs = [], locked = false;
+
+const app = document.getElementById("app");
+
+function boot() { renderWelcome(); }   // 真值已内联，file:// 下无需 fetch
+
+function renderWelcome() {
+  app.innerHTML = `
+    <h1>无人机感知界面可读性测试</h1>
+    <p>你会看到 60 张无人机前视画面，界面样式有三种，随机出现。</p>
+    <p>任务：判断<b>此刻飞机前方是否有危险</b>，即障碍物是否可能撞上。<br>
+       不用纠结边界情况，凭第一印象快速判断。</p>
+    <p>用键盘 <b>←</b> 表示有危险，<b>→</b> 表示安全，也可以点按钮。</p>
+    <p style="margin-top:20px">请输入你的编号（如 S01）</p>
+    <input id="sid" style="padding:12px;width:160px;text-align:center;font-size:16px;
+           background:#1b1e26;border:1px solid #2c313c;border-radius:6px;color:#e8ecf2">
+    <div class="btns"><button id="start">开始（约 6 分钟）</button></div>`;
+  document.getElementById("start").onclick = () => {
+    subj = (document.getElementById("sid").value || "anon").trim();
+    idx = 0; recs = []; next();
+  };
+}
+
+function next() {
+  if (idx >= TRIALS.length) return finish();
+  const t = TRIALS[idx];
+  const img = new Image();
+  img.onload = () => {
+    app.innerHTML = `
+      <div id="bar"><i style="width:${100*idx/TRIALS.length}%"></i></div>
+      <img src="${t.file}" alt="">
+      <div class="btns">
+        <button id="danger">有危险 ←</button>
+        <button id="safe">安全 →</button>
+      </div>
+      <div class="hint">${idx+1} / ${TRIALS.length}</div>`;
+    locked = false;
+    t0 = performance.now();
+    document.getElementById("danger").onclick = () => answer("danger");
+    document.getElementById("safe").onclick = () => answer("safe");
+  };
+  img.src = t.file;
+}
+
+function answer(choice) {
+  if (locked) return;
+  locked = true;
+  const rt = Math.round(performance.now() - t0);
+  const t = TRIALS[idx];
+  recs.push({ subject: subj, version: t.ver, frame: t.frame, choice, rt_ms: rt });
+  idx++;
+  setTimeout(next, 120);
+}
+
+document.addEventListener("keydown", e => {
+  if (locked || !document.getElementById("danger")) return;
+  if (e.key === "ArrowLeft") answer("danger");
+  if (e.key === "ArrowRight") answer("safe");
+});
+
+function finish() {
+  const truth = TRUTH;
+
+  const byVer = {};
+  for (const r of recs) {
+    const tv = truth[parseInt(r.frame, 10)];
+    const ok = (r.choice === "danger") === (tv === "danger");
+    (byVer[r.version] = byVer[r.version] || { n: 0, ok: 0, rt: [] });
+    byVer[r.version].n++; byVer[r.version].ok += ok ? 1 : 0;
+    byVer[r.version].rt.push(r.rt_ms);
+  }
+  const lines = Object.entries(byVer).sort().map(([v, d]) => {
+    const acc = (100 * d.ok / d.n).toFixed(1);
+    const rt = Math.round(d.rt.reduce((a, b) => a + b, 0) / d.rt.length);
+    return `方案 ${v}：正确率 ${acc}%　平均反应 ${rt} ms`;
+  }).join("<br>");
+
+  const csv = "subject,version,frame,choice,rt_ms\n" +
+              recs.map(r => [r.subject, r.version, r.frame, r.choice, r.rt_ms].join(",")).join("\n");
+  app.innerHTML = `
+    <h1>测试结束，谢谢</h1>
+    <p style="font-size:17px;line-height:2.2">${lines}</p>
+    <p class="hint">请把下面的数据整段复制发给主试</p>
+    <textarea id="csv" readonly>${csv}</textarea>
+    <div class="btns"><button id="cp" style="background:#4a90d9">复制数据</button></div>`;
+  document.getElementById("cp").onclick = () => {
+    const ta = document.getElementById("csv");
+    ta.select(); document.execCommand("copy");
+    document.getElementById("cp").textContent = "已复制";
+  };
+}
+
+boot();
+</script>
+</body>
+</html>
