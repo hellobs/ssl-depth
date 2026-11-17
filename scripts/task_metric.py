@@ -73,10 +73,10 @@ def main():
     print("全量 %d 趟 %d 帧"
           % (len(eps_all), sum(len(idx["kept"][e]) for e in eps_all)), flush=True)
 
-    for backbone, run_dir in [("imagenet", "runs/v2_imagenet"),
-                              ("resnet_scratch", "runs/v2_resnet_scratch"),
-                              ("jepa", "runs/v2_jepa"),
-                              ("scratch", "runs/v2_scratch")]:
+    for backbone, run_dir in [("imagenet", "runs/v3_imagenet"),
+                              ("resnet_scratch", "runs/v3_resnet_scratch"),
+                              ("jepa", "runs/v3_jepa"),
+                              ("scratch", "runs/v3_scratch")]:
         if not Path(run_dir).exists():
             print("跳过", backbone, "(缺少", run_dir, ")"); continue
         bb, head, dev = build(backbone, run_dir)

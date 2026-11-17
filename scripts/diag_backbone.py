@@ -31,8 +31,17 @@ from torch.utils.data import DataLoader, Dataset, RandomSampler
 
 sys.path.insert(0, "D:/zzr/microwm/src")
 
-CACHE = Path("D:/zzr/ssl-depth/cache/kept80.json")
-ROOT = Path("D:/zzr/wmdata/runs")
+CACHE = Path("D:/zzr/ssl-depth/cache/kept_all.json")
+ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2")]
+
+
+def find_obs(run: str, episode: str) -> Path:
+    """两批数据分处不同根目录，按存在性定位。"""
+    for r in ROOTS:
+        p = r / run / episode / "observations"
+        if p.is_dir():
+            return p
+    raise FileNotFoundError("%s/%s" % (run, episode))
 
 IMG_H, IMG_W = 108, 192          # 预训练规格
 MAX_DEPTH = 80.0
@@ -76,7 +85,7 @@ class Frames(Dataset):
     def __getitem__(self, i):
         ep, stem = self.items[i]
         run, episode = ep.split("/")
-        obs = ROOT / run / episode / "observations"
+        obs = find_obs(run, episode)
         bgr = cv2.imread(str(obs / f"{stem}_front_rgb.png"), cv2.IMREAD_COLOR)
         rgb = cv2.cvtColor(cv2.resize(bgr, (IMG_W, IMG_H), interpolation=cv2.INTER_AREA),
                            cv2.COLOR_BGR2RGB).astype(np.float32) / 127.5 - 1.0
@@ -310,7 +319,7 @@ def main():
           % (best["epoch"], tm["absrel_med"], tm["d1"], tm["rmse"],
              tm["spatial_std_m"] or -1), flush=True)
 
-    out = Path("D:/zzr/ssl-depth/runs/v2_%s" % a.backbone)
+    out = Path("D:/zzr/ssl-depth/runs/v3_%s" % a.backbone)
     out.mkdir(parents=True, exist_ok=True)
     (out / "metrics.json").write_text(json.dumps(
         {"backbone": a.backbone, "args": vars(a), "best_val": best, "test": tm,
