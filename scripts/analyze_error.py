@@ -1,7 +1,7 @@
 """误差分层分析：按距离、按架次、按画面构成。
 
 用法：python analyze_error.py --backbone imagenet
-输出：runs/v3_<backbone>/error_analysis.json
+输出：runs/v4_<backbone>/error_analysis.json
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def build(backbone):
         from diag_backbone import CKPTS
         bb = JepaBackbone(None if backbone == "scratch" else CKPTS[backbone]).to(dev)
     head = DepthHead(192).to(dev)
-    sd = torch.load(ROOT / "runs" / ("v3_" + backbone) / "head.pt",
+    sd = torch.load(ROOT / "runs" / ("v4_" + backbone) / "head.pt",
                     map_location="cpu", weights_only=False)
     head.load_state_dict(sd["head"])
     if "proj" in sd and hasattr(bb, "proj"):
@@ -117,7 +117,7 @@ def main():
                  r["gt_med"], 100 * r["sky"], r["tex"]))
         out["worst"].append(r)
 
-    p = ROOT / "runs" / ("v3_" + a.backbone) / "error_analysis.json"
+    p = ROOT / "runs" / ("v4_" + a.backbone) / "error_analysis.json"
     p.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     print("\n写入", p)
 

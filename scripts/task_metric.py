@@ -22,6 +22,7 @@ from diag_backbone import (CACHE, DepthHead, Frames, JepaBackbone,  # noqa: E402
                            ResnetBackbone, split)
 
 THRESHOLDS = [6.0, 9.0, 12.0, 15.0, 20.0]
+ROOT = Path("D:/zzr/ssl-depth")
 
 
 def front_near(depth: np.ndarray) -> float:
@@ -67,16 +68,29 @@ def collect(bb, head, dev, idx, eps):
 
 
 def main():
-    idx = json.loads(CACHE.read_text(encoding="utf-8"))
-    tr, va, te = split(idx, 0)
-    eps_all = sorted(idx["kept"])
-    print("全量 %d 趟 %d 帧"
-          % (len(eps_all), sum(len(idx["kept"][e]) for e in eps_all)), flush=True)
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--split", default="all", choices=["all", "held"],
+                    help="all=全量（含训练帧）；held=仅验证+测试")
+    a = ap.parse_args()
 
-    for backbone, run_dir in [("imagenet", "runs/v3_imagenet"),
-                              ("resnet_scratch", "runs/v3_resnet_scratch"),
-                              ("jepa", "runs/v3_jepa"),
-                              ("scratch", "runs/v3_scratch")]:
+    idx = json.loads(CACHE.read_text(encoding="utf-8"))
+    # 必须用训练时记录的划分：索引后来重建过（补采 9 段、清理 3 段），
+    # 现算 split() 会与训练划分不一致，导致训练帧漏进留出集。
+    sp = json.loads((ROOT / "runs" / "v4_imagenet" / "metrics.json")
+                    .read_text(encoding="utf-8"))["split"]
+    if a.split == "held":
+        eps_all = sorted(set(sp["val"]) | set(sp["test"]))
+    else:
+        eps_all = sorted(idx["kept"])
+    print("%s %d 趟 %d 帧"
+          % (a.split, len(eps_all),
+             sum(len(idx["kept"][e]) for e in eps_all)), flush=True)
+
+    for backbone, run_dir in [("imagenet", "runs/v4_imagenet"),
+                              ("resnet_scratch", "runs/v4_resnet_scratch"),
+                              ("jepa", "runs/v4_jepa"),
+                              ("scratch", "runs/v4_scratch")]:
         if not Path(run_dir).exists():
             print("跳过", backbone, "(缺少", run_dir, ")"); continue
         bb, head, dev = build(backbone, run_dir)
@@ -95,12 +109,14 @@ def main():
         rec = {}
         for t in THRESHOLDS:
             dg, dp = g < t, p < t
-            a = int((dg & dp).sum()); b = int((dg & ~dp).sum())
-            c = int((~dg & dp).sum()); d = int((~dg & ~dp).sum())
-            r = a / max(1, a + b)
-            print("  %5.0f %8d %8d %8d %8d %9.1f%%" % (t, a, b, c, d, 100 * r))
-            rec[t] = {"hit": a, "miss": b, "false": c, "pass": d, "recall": r}
-        out = Path(run_dir) / "task_metric.json"
+            tp = int((dg & dp).sum()); fn = int((dg & ~dp).sum())
+            fp = int((~dg & dp).sum()); tn = int((~dg & ~dp).sum())
+            r = tp / max(1, tp + fn)
+            print("  %5.0f %8d %8d %8d %8d %9.1f%%"
+                  % (t, tp, fn, fp, tn, 100 * r))
+            rec[t] = {"hit": tp, "miss": fn, "false": fp, "pass": tn, "recall": r}
+        out = Path(run_dir) / ("task_metric%s.json"
+                               % ("" if a.split == "all" else "_" + a.split))
         out.write_text(json.dumps({"backbone": backbone, "n": int(g.size),
                                    "gt_median": float(np.median(g)),
                                    "pr_median": float(np.median(p)),

@@ -32,7 +32,9 @@ from torch.utils.data import DataLoader, Dataset, RandomSampler
 sys.path.insert(0, "D:/zzr/microwm/src")
 
 CACHE = Path("D:/zzr/ssl-depth/cache/kept_all.json")
-ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2")]
+ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
+         Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
+         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/near_out")]
 
 
 def find_obs(run: str, episode: str) -> Path:
@@ -319,7 +321,7 @@ def main():
           % (best["epoch"], tm["absrel_med"], tm["d1"], tm["rmse"],
              tm["spatial_std_m"] or -1), flush=True)
 
-    out = Path("D:/zzr/ssl-depth/runs/v3_%s" % a.backbone)
+    out = Path("D:/zzr/ssl-depth/runs/v4_%s" % a.backbone)
     out.mkdir(parents=True, exist_ok=True)
     (out / "metrics.json").write_text(json.dumps(
         {"backbone": a.backbone, "args": vars(a), "best_val": best, "test": tm,

@@ -1,0 +1,43 @@
+{
+ "backbone": "resnet_scratch",
+ "n": 4581,
+ "gt_median": 26.859373092651367,
+ "pr_median": 0.3850744962692261,
+ "by_threshold": {
+  "6.0": {
+   "hit": 163,
+   "miss": 0,
+   "false": 4418,
+   "pass": 0,
+   "recall": 1.0
+  },
+  "9.0": {
+   "hit": 313,
+   "miss": 0,
+   "false": 4268,
+   "pass": 0,
+   "recall": 1.0
+  },
+  "12.0": {
+   "hit": 575,
+   "miss": 0,
+   "false": 4006,
+   "pass": 0,
+   "recall": 1.0
+  },
+  "15.0": {
+   "hit": 778,
+   "miss": 0,
+   "false": 3803,
+   "pass": 0,
+   "recall": 1.0
+  },
+  "20.0": {
+   "hit": 1311,
+   "miss": 0,
+   "false": 3270,
+   "pass": 0,
+   "recall": 1.0
+  }
+ }
+}

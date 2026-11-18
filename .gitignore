@@ -23,3 +23,13 @@ Thumbs.db
 # 打包产物与临时文件
 *.zip
 runs/_peek/
+*.bak
+*.bak.json
+
+# 发布副本里的图片（由 review/imgs 同步，避免同一批图入库两次）
+# 重新发布前执行：cp -r review/imgs deploy_review/review/
+deploy_review/review/imgs/
+
+# WorkBuddy 的应用标记与工具状态
+.wbapp_*.genie
+.workbuddy/
