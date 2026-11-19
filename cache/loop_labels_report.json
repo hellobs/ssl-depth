@@ -1,0 +1,22 @@
+{
+ "reviews": 46,
+ "reviewers": 3,
+ "resolve": {
+  "可用": 46
+ },
+ "items": 38,
+ "usable": 33,
+ "label_balance": {
+  "null": 5,
+  "0": 26,
+  "1": 7
+ },
+ "conflict": 6,
+ "conflict_rate": 0.158,
+ "kappa": 0.0,
+ "double_annotated_items": 4,
+ "threshold": 9.0,
+ "margin": 1.5,
+ "drop_conflict": false,
+ "near_gt": 16
+}

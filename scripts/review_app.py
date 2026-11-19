@@ -644,6 +644,18 @@ def review(name: str, request: Request):
     pool = cur_items(name)
     path = "/review/" + name
 
+    # 仅用于论文配图：?peek=N 直接渲染第 N 条（浅拷贝，不改会话状态），
+    # ?reasons=1 让理由面板初始就展开（正常流程里它要等判定之后才出现）。
+    # 两个参数都不写数据库，也不影响真实评审。
+    show_reasons = request.query_params.get("reasons") == "1"
+    peek = request.query_params.get("peek")
+    if peek is not None and pool:
+        try:
+            s = dict(s)
+            s["pos"] = max(0, min(int(peek), len(pool) - 1))
+        except ValueError:
+            pass
+
     if s["pos"] >= len(pool):
         if s["phase"] == 0:
             s["phase"] = 1
@@ -735,7 +747,7 @@ def review(name: str, request: Request):
             <button type="button" id="btn-reject" onclick="choose('reject')">{t['reject']}<kbd>3</kbd></button>
             <button type="button" id="btn-unknown" onclick="choose('unknown')">{t['unknown']}<kbd>4</kbd></button>
           </div>
-          <div class="reasons{' two' if lang == 'zh' else ''}" id="rbox" style="display:none">
+          <div class="reasons{' two' if lang == 'zh' else ''}" id="rbox" style="display:{'grid' if show_reasons else 'none'}">
             <div class="why">{t['why']}</div>
             {reasons}
             <input class="note" type="text" name="note" placeholder="{t['note_ph']}">

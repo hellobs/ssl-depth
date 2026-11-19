@@ -90,6 +90,7 @@ def main():
     for backbone, run_dir in [("imagenet", "runs/v4_imagenet"),
                               ("resnet_scratch", "runs/v4_resnet_scratch"),
                               ("jepa", "runs/v4_jepa"),
+                              ("jepa_domain", "runs/v4_jepa_domain"),
                               ("scratch", "runs/v4_scratch")]:
         if not Path(run_dir).exists():
             print("跳过", backbone, "(缺少", run_dir, ")"); continue

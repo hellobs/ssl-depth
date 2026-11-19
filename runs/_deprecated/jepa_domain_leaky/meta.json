@@ -1,0 +1,32 @@
+{
+ "cfg": {
+  "model": {
+   "patch": 6,
+   "dim": 192,
+   "depth": 6,
+   "heads": 3,
+   "mlp_ratio": 4,
+   "in_ch": 3,
+   "pred_depth": 4,
+   "ema_tau": 0.996,
+   "vicreg_var": 0.04,
+   "vicreg_cov": 0.01,
+   "vicreg_tvar": 0.01,
+   "pred_metric": "l1"
+  },
+  "data": {
+   "img_h": 108,
+   "img_w": 192,
+   "grid_h": 18,
+   "grid_w": 32
+  }
+ },
+ "runs": "all",
+ "skip": [
+  "1d3aec79",
+  "cf2e5d5e"
+ ],
+ "pairs": 17492,
+ "steps": 4000,
+ "episodes": 100
+}

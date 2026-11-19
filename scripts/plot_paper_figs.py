@@ -27,11 +27,10 @@ NAME = {
     "imagenet": "ImageNet\n有监督预训练",
     "resnet_scratch": "ResNet18\n随机初始化",
     "jepa": "JEPA 自监督\n航拍数据",
-    "dronelab": "JEPA 自监督\n简化场景",
     "scratch": "ViT\n随机初始化",
 }
-ORDER = ["imagenet", "resnet_scratch", "jepa", "dronelab", "scratch"]
-COLORS = ["#c0392b", "#e08a7a", "#2e86c1", "#7fb3d5", "#95a5a6"]
+ORDER = ["imagenet", "resnet_scratch", "jepa", "scratch"]
+COLORS = ["#c0392b", "#e08a7a", "#2e86c1", "#95a5a6"]
 
 
 def load(backbone: str, kind: str):

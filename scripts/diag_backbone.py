@@ -49,13 +49,15 @@ IMG_H, IMG_W = 108, 192          # 预训练规格
 MAX_DEPTH = 80.0
 MIN_DEPTH = 0.5
 
-# 两套自监督权重，模型结构相同（patch 6 / dim 192 / depth 6 / heads 3 / 576 token），
-# 差别只在预训练数据：
-#   base_s6  VisDrone，真实航拍俯视，4000 步     -> 内容与视角都不匹配
-#   dl_act8k dronelab_train，AirSim 前视低空，8000 步 -> 视角匹配、场景简化
+# 自监督权重（patch 6 / dim 192 / depth 6 / heads 3 / 576 token）
+#   base_s6           VisDrone，真实航拍俯视，4000 步 -> 内容与视角都与本任务不匹配
+#   jepa_domain       v4 划分下的 52 个纯训练 run / 58 航段 / 10014 帧对 / 4000 步
+#                     （零泄漏，两道断言通过；论文唯一引用的域内权重）
+#   已废弃：runs/_deprecated/ 下的 jepa_domain_leaky（14/16 测试航段被看过）
+#           与 jepa_domain_clean（20/29 留出航段被看过）
 CKPTS = {
     "jepa": Path("D:/zzr/microwm/outputs/base_s6/jepa.pt"),
-    "dronelab": Path("D:/zzr/microwm/outputs/dl_act8k/jepa.pt"),
+    "jepa_domain": Path("D:/zzr/ssl-depth/runs/jepa_domain_v4/jepa.pt"),
 }
 
 # 与 jepa.pt 完全一致的模型配置（从 ckpt 里读出来后写死，避免依赖加载顺序）
@@ -243,18 +245,23 @@ def evaluate(bb, head, dl, dev):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--backbone", required=True,
-                    choices=["scratch", "jepa", "dronelab", "imagenet", "resnet_scratch"])
+                    choices=["scratch", "jepa", "jepa_domain", "imagenet", "resnet_scratch"])
     ap.add_argument("--epochs", type=int, default=15)
     ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--workers", type=int, default=4,
+                    help="数据加载进程数。0 时每个样本要读 RGB+深度+掩码三个文件，GPU 会空转等磁盘")
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--device", default="cuda", choices=["cuda", "cpu"],
+                    help="cpu 时不碰显卡；训练速度约慢一个数量级")
     ap.add_argument("--label-ratio", type=float, default=1.0,
                     help="训练集保留多少帧，用于标签效率扫描")
     a = ap.parse_args()
 
     torch.manual_seed(a.seed)
-    dev = "cuda"
-    torch.cuda.set_per_process_memory_fraction(0.45, 0)   # 有别的任务在跑，留余量
+    dev = a.device
+    if dev == "cuda":
+        torch.cuda.set_per_process_memory_fraction(0.45, 0)   # 有别的任务在跑，留余量
     idx = json.loads(CACHE.read_text(encoding="utf-8"))
     tr, va, te = split(idx, 0)
     n_tr = sum(len(idx["kept"][e]) for e in tr)
@@ -271,9 +278,12 @@ def main():
         print("  tokens %dx%d = %d" % (bb.tok_h, bb.tok_w, bb.tok_h * bb.tok_w), flush=True)
     head = DepthHead(192).to(dev)
 
-    dl_tr = DataLoader(Frames(idx, tr), batch_size=a.batch, shuffle=True, num_workers=0, drop_last=True)
-    dl_va = DataLoader(Frames(idx, va), batch_size=a.batch, num_workers=0)
-    dl_te = DataLoader(Frames(idx, te), batch_size=a.batch, num_workers=0)
+    dl_tr = DataLoader(Frames(idx, tr), batch_size=a.batch, shuffle=True,
+                       num_workers=a.workers, pin_memory=(dev == "cuda"), drop_last=True)
+    dl_va = DataLoader(Frames(idx, va), batch_size=a.batch, num_workers=a.workers,
+                       pin_memory=(dev == "cuda"))
+    dl_te = DataLoader(Frames(idx, te), batch_size=a.batch, num_workers=a.workers,
+                       pin_memory=(dev == "cuda"))
 
     # 标签效率：只抽训练帧，val/test 不动。所有比例看同样多的样本（固定步数），
     # 否则少标签时 epochs 变少会与「标签少」这个变量混在一起。
@@ -285,7 +295,8 @@ def main():
     nsamp = spe * a.batch
     ds_tr = Frames(idx, tr, pick)
     dl_tr = DataLoader(
-        ds_tr, batch_size=a.batch, drop_last=True, num_workers=0,
+        ds_tr, batch_size=a.batch, drop_last=True, num_workers=a.workers,
+        pin_memory=(dev == "cuda"),
         sampler=RandomSampler(ds_tr, replacement=len(pick) < nsamp, num_samples=nsamp))
     print("  标签比例 %.0f%%：训练帧 %d / %d，每轮 %d 步 × %d 轮"
           % (100 * a.label_ratio, len(pick), n_full, spe, a.epochs), flush=True)
