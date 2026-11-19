@@ -33,3 +33,8 @@ deploy_review/review/imgs/
 # WorkBuddy 的应用标记与工具状态
 .wbapp_*.genie
 .workbuddy/
+
+# 有意不入库：旧的第二份构建、参考资料 PDF、沙箱探测残留
+paper/main-2.pdf
+paper/【ykt*.pdf
+_wtest_*.txt
