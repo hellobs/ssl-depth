@@ -61,3 +61,7 @@ runs/*.log
 runs/DIAG_*.md
 runs/pure_train_runs.txt
 runs/pure_train_runs_v4.txt
+
+# 早期探测用的索引变体
+cache/kept.json
+cache/kept80.json
