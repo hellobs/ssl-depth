@@ -39,5 +39,8 @@ paper/main-2.pdf
 paper/【ykt*.pdf
 _wtest_*.txt
 
+# 投稿用导出副本（main.pdf 才是构建产物）
+paper/基于人工智能的无人机单目深度测距的误差分析与设计研究.pdf
+
 # LoRA 适配实验（按作者决定未进论文，仅本地留存）
 runs/jepa_lora_*/
