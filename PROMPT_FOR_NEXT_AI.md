@@ -2,9 +2,9 @@
 
 ---
 
-你接手一个已经做到后期的课程论文项目，工作目录 `D:/zzr/ssl-depth`。
+你接手一个已经做到后期的课程论文项目，工作目录 `<repo>`。
 
-**第一步：完整读 `D:/zzr/ssl-depth/HANDOFF.md`，不要跳过。** 里面写了环境路径、数据划分陷阱、权重清单、
+**第一步：完整读 `<repo>/HANDOFF.md`，不要跳过。** 里面写了环境路径、数据划分陷阱、权重清单、
 已完成的全部数字、踩过的八个坑。不读就动手一定会重复已经犯过的错。
 
 ## 现在的断点
@@ -20,15 +20,15 @@
 1. **重跑深度头**（CPU，约 1 小时 43 分；如果 GPU 空着且用户同意，12 分钟）：
 
 ```bash
-cd D:/zzr/ssl-depth
-OMP_NUM_THREADS=12 D:/zzr/microwm/.venv/Scripts/python.exe -u scripts/diag_backbone.py \
+cd <repo>
+OMP_NUM_THREADS=12 $WM_CODE_ROOT/.venv/Scripts/python.exe -u scripts/diag_backbone.py \
   --backbone jepa_domain --epochs 15 --workers 3 --device cpu
 ```
 
 2. **重算任务指标**：
 
 ```bash
-D:/zzr/microwm/.venv/Scripts/python.exe -u scripts/task_metric.py --split held
+$WM_CODE_ROOT/.venv/Scripts/python.exe -u scripts/task_metric.py --split held
 ```
 
 3. **按新数改 `paper/main.tex` 四处**（中英摘要、`tab:backbone`、`tab:scale`、6.x 决策段），
@@ -38,8 +38,8 @@ D:/zzr/microwm/.venv/Scripts/python.exe -u scripts/task_metric.py --split held
 
 ## 硬约束（违反任何一条都会造成返工）
 
-- **Python 只有一个能用的**：`D:/zzr/microwm/.venv/Scripts/python.exe`。其它 conda 环境要么没 cv2、要么没 torch。
-- **绝对不要修改 `D:/zzr/tools/wm-collector-m/`**（采集器，另一个项目在用）。需要改就复制到工作区再改。
+- **Python 只有一个能用的**：`$WM_CODE_ROOT/.venv/Scripts/python.exe`。其它 conda 环境要么没 cv2、要么没 torch。
+- **绝对不要修改 `<workspace>/tools/wm-collector-m/`**（采集器，另一个项目在用）。需要改就复制到工作区再改。
 - **不要把 GPU 当自己的**。先 `nvidia-smi --query-compute-apps` 看有没有别人的进程；
   注意常驻的 3.2–3.4 GB 是 AirSim（`CityEnviron.exe`），不是训练。用不用 GPU 要先问。
 - **数据划分只有一个权威来源**：`runs/v4_imagenet/metrics.json` 的 `split`（98 航段）。

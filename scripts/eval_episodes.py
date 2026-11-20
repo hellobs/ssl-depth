@@ -1,6 +1,14 @@
 """逐 episode 诊断：GT 深度分布 + 训练好的模型在每个 episode 上的 δ1。"""
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import json
 import sys
 from pathlib import Path
@@ -14,13 +22,13 @@ import train_min as T  # noqa: E402
 
 
 def main():
-    ck = torch.load("D:/zzr/ssl-depth/runs/min20_80m/min3.pt", map_location="cuda")
+    ck = torch.load(f"{REPO}/runs/min20_80m/min3.pt", map_location="cuda")
     model = T.MicroJEPA(ck["cfg"]).cuda()
     model.encoder.load_state_dict(ck["encoder"])
     head = T.DepthDecoder(ck["cfg"]["model"]["dim"]).cuda()
     head.load_state_dict(ck["head"])
     idx = T.build_index()
-    meta = json.load(open("D:/zzr/ssl-depth/runs/min20_80m/metrics.json"))
+    meta = json.load(open(f"{REPO}/runs/min20_80m/metrics.json"))
     part = {e: k for k, v in meta["split"].items() for e in v}
 
     print("%-38s %-6s %5s %8s %8s %6s %6s" % ("episode", "split", "n", "gt_med", "gt_p90", "d1", "AbsRel"))

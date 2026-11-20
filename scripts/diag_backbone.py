@@ -15,6 +15,14 @@
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import random
@@ -29,15 +37,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, RandomSampler
 
-sys.path.insert(0, "D:/zzr/microwm/src")
+sys.path.insert(0, f"{MICROW}/src")
 
-CACHE = Path("D:/zzr/ssl-depth/cache/kept_all.json")
-ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
-         Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
-         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/wmdata/near_out"),
-         Path("D:/zzr/wmdata/runs_batch5"), Path("D:/zzr/wmdata/runs_batch6"),
-         Path("D:/zzr/wmdata/runs_batch7"), Path("D:/zzr/wmdata/runs_b8_newgoal"),
-         Path("D:/zzr/wmdata/runs_other_ai")]
+CACHE = Path(f"{REPO}/cache/kept_all.json")
+ROOTS = [Path(f"{DATA}/runs"), Path(f"{DATA}/runs_batch2"),
+         Path(f"{DATA}/runs_batch3"), Path(f"{DATA}/runs_batch4"),
+         Path(f"{DATA}/runs_nearfield"), Path(f"{DATA}/near_out"),
+         Path(f"{DATA}/runs_batch5"), Path(f"{DATA}/runs_batch6"),
+         Path(f"{DATA}/runs_batch7"), Path(f"{DATA}/runs_b8_newgoal"),
+         Path(f"{DATA}/runs_other_ai")]
 
 
 def find_obs(run: str, episode: str) -> Path:
@@ -59,14 +67,14 @@ MIN_DEPTH = 0.5
 #   已废弃：runs/_deprecated/ 下的 jepa_domain_leaky（14/16 测试航段被看过）
 #           与 jepa_domain_clean（20/29 留出航段被看过）
 CKPTS = {
-    "jepa": Path("D:/zzr/microwm/outputs/base_s6/jepa.pt"),
-    "jepa_domain": Path("D:/zzr/ssl-depth/runs/jepa_domain_v4/jepa.pt"),
+    "jepa": Path(f"{MICROW}/outputs/base_s6/jepa.pt"),
+    "jepa_domain": Path(f"{REPO}/runs/jepa_domain_v4/jepa.pt"),
     # v5：训练语料扩到全盘 152 航段 / 17,053 帧（v4 是 66 / 8,565），val/test 不变
-    "jepa_domain_v5": Path("D:/zzr/ssl-depth/runs/jepa_domain_v5/jepa.pt"),
+    "jepa_domain_v5": Path(f"{REPO}/runs/jepa_domain_v5/jepa.pt"),
     # v5 + gap 4 + 12000 步：补齐上一版的欠训（4000 步只过 3 遍）
-    "jepa_domain_v5_g4": Path("D:/zzr/ssl-depth/runs/jepa_domain_v5_g4/jepa.pt"),
+    "jepa_domain_v5_g4": Path(f"{REPO}/runs/jepa_domain_v5_g4/jepa.pt"),
     # v6：在 v5 的 153 航段基础上加入 2026-11-19/20 新采的 87 航段（近场两轮 + 合作方三批）
-    "jepa_domain_v6": Path("D:/zzr/ssl-depth/runs/jepa_domain_v6/jepa.pt"),
+    "jepa_domain_v6": Path(f"{REPO}/runs/jepa_domain_v6/jepa.pt"),
 }
 
 # 与 jepa.pt 完全一致的模型配置（从 ckpt 里读出来后写死，避免依赖加载顺序）
@@ -92,7 +100,7 @@ def split(idx: dict, seed: int = 0):
     return eps[:a], eps[a:b], eps[b:]
 
 
-AUTH_SPLIT = Path("D:/zzr/ssl-depth/runs/v4_imagenet/metrics.json")
+AUTH_SPLIT = Path(f"{REPO}/runs/v4_imagenet/metrics.json")
 
 
 def load_split(idx: dict, split_path: Path | None = None):
@@ -378,7 +386,7 @@ def main():
              tm["spatial_std_m"] or -1), flush=True)
 
     name = a.out_name or ("v4_" + a.backbone)
-    out = Path("D:/zzr/ssl-depth/runs") / name
+    out = Path(f"{REPO}/runs") / name
     out.mkdir(parents=True, exist_ok=True)
     (out / "metrics.json").write_text(json.dumps(
         {"backbone": a.backbone, "args": vars(a), "best_val": best, "test": tm,

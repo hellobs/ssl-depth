@@ -35,7 +35,7 @@
 
 ## 2. 环境（先确认这个，否则会白跑）
 
-**唯一的完整 Python 环境**：`D:/zzr/microwm/.venv/Scripts/python.exe`
+**唯一的完整 Python 环境**：`$WM_CODE_ROOT/.venv/Scripts/python.exe`
 （Python 3.13 + torch 2.9.1+cu128 + cv2 5.0.0 + torchvision）
 
 其它环境都不完整，不要用：
@@ -55,13 +55,13 @@
 ### 3.1 数据落在 7 个根目录
 
 ```
-D:/zzr/wmdata/runs            10 run / 20 航段 / 3167 帧
-D:/zzr/wmdata/runs_batch2     13 run / 20 航段 / 3989 帧
-D:/zzr/wmdata/runs_batch3     20 run / 20 航段 / 3151 帧
-D:/zzr/wmdata/runs_batch4     19 run / 19 航段 / 4302 帧
-D:/zzr/wmdata/runs_nearfield  15 run /  1 航段 /  152 帧   ← 14 个 run 是空跑，没有 observations
-D:/zzr/wmdata/near_out               30 run / 29 航段 / 3590 帧   ← 5 个航段缺 observations
-D:/zzr/wmdata/near_out2              10 run / 10 航段 / 1422 帧   ← 外部验收集，永不训练
+$WM_DATA_ROOT/runs            10 run / 20 航段 / 3167 帧
+$WM_DATA_ROOT/runs_batch2     13 run / 20 航段 / 3989 帧
+$WM_DATA_ROOT/runs_batch3     20 run / 20 航段 / 3151 帧
+$WM_DATA_ROOT/runs_batch4     19 run / 19 航段 / 4302 帧
+$WM_DATA_ROOT/runs_nearfield  15 run /  1 航段 /  152 帧   ← 14 个 run 是空跑，没有 observations
+$WM_DATA_ROOT/near_out               30 run / 29 航段 / 3590 帧   ← 5 个航段缺 observations
+$WM_DATA_ROOT/near_out2              10 run / 10 航段 / 1422 帧   ← 外部验收集，永不训练
 ```
 
 全部 `run.json` 的 `schema` 都是 `airsim-delivery-m.v1`（M 包采集器）。
@@ -91,8 +91,8 @@ D:/zzr/wmdata/near_out2              10 run / 10 航段 / 1422 帧   ← 外部�
 | `runs/jepa_domain_v4/jepa.pt` | v4 划分下 52 个纯训练 run / 58 航段 / 10,014 帧对 / 4000 步 | **唯一可引用**。两道泄漏断言通过，`231/231` 张量可加载 |
 | `runs/jepa_domain_clean/` | 56 run / 65 航段 / 11,752 帧对 | **不可引用**。20/29 个留出航段进过预训练（用错了 kept_all 划分） |
 | `runs/_deprecated/jepa_domain_leaky/` | 100 航段 / 17,492 帧对 | **不可引用**。14/16 个测试航段进过预训练（按 run 名排除，但划分是航段级） |
-| `D:/zzr/microwm/outputs/base_s6/jepa.pt` | VisDrone，4000 步 | 论文已删该臂，但代码里 `jepa` 臂仍指向它，留作可复现对照 |
-| `D:/zzr/microwm/outputs/dl_act8k/` | dronelab_train，8000 步，`use_actions=True` | **已删除**（2026-11-19，707 MB）。下游 δ1 只有 0.238 |
+| `$WM_CODE_ROOT/outputs/base_s6/jepa.pt` | VisDrone，4000 步 | 论文已删该臂，但代码里 `jepa` 臂仍指向它，留作可复现对照 |
+| `$WM_CODE_ROOT/outputs/dl_act8k/` | dronelab_train，8000 步，`use_actions=True` | **已删除**（2026-11-19，707 MB）。下游 δ1 只有 0.238 |
 
 三个域内权重的关系：`leaky` → `clean` → `v4`，每一版都在修上一版的泄漏，**而数字几乎不变（0.830 / 0.829）。
 这就是最危险的地方——光看数字分辨不出哪版有污染，只能靠路径和断言。
@@ -286,7 +286,7 @@ AbsRel 从 0.163 变 0.249 主要来自换测试集，其中一趟真值中位 1
 
 ## 9. 不要做的事
 
-1. **不要改 `D:/zzr/tools/wm-collector-m/`**（M 包采集器）。用户明确要求：需要改就复制一份到工作区再改。
+1. **不要改 `<workspace>/tools/wm-collector-m/`**（M 包采集器）。用户明确要求：需要改就复制一份到工作区再改。
 2. **不要在没有通过泄漏断言的情况下产出权重**。断言失败就修语料，不要调参数绕过。
 3. **不要偷偷用 GPU**。机器上有别的任务在跑，GPU 状态要主动报告（见 §2 的判别方法）。
 4. **不要为了让数字好看而换语料**。数字掉下来就改论文，不改数据。

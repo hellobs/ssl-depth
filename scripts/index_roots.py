@@ -12,6 +12,14 @@
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import os
@@ -20,18 +28,18 @@ from pathlib import Path
 import numpy as np
 
 BASE = {
-    "runs": "D:/zzr/wmdata/runs",
-    "runs_batch2": "D:/zzr/wmdata/runs_batch2",
-    "runs_batch3": "D:/zzr/wmdata/runs_batch3",
-    "runs_batch4": "D:/zzr/wmdata/runs_batch4",
-    "runs_batch5": "D:/zzr/wmdata/runs_batch5",
-    "runs_batch6": "D:/zzr/wmdata/runs_batch6",
-    "runs_batch7": "D:/zzr/wmdata/runs_batch7",
-    "runs_b8_newgoal": "D:/zzr/wmdata/runs_b8_newgoal",
-    "runs_nearfield": "D:/zzr/wmdata/runs_nearfield",
-    "runs_other_ai": "D:/zzr/wmdata/runs_other_ai",
-    "near_out": "D:/zzr/wmdata/near_out",
-    "near_out2": "D:/zzr/wmdata/near_out2",
+    "runs": f"{DATA}/runs",
+    "runs_batch2": f"{DATA}/runs_batch2",
+    "runs_batch3": f"{DATA}/runs_batch3",
+    "runs_batch4": f"{DATA}/runs_batch4",
+    "runs_batch5": f"{DATA}/runs_batch5",
+    "runs_batch6": f"{DATA}/runs_batch6",
+    "runs_batch7": f"{DATA}/runs_batch7",
+    "runs_b8_newgoal": f"{DATA}/runs_b8_newgoal",
+    "runs_nearfield": f"{DATA}/runs_nearfield",
+    "runs_other_ai": f"{DATA}/runs_other_ai",
+    "near_out": f"{DATA}/near_out",
+    "near_out2": f"{DATA}/near_out2",
 }
 MIN_VALID, MAX_DEPTH = 0.50, 80.0
 OBS = "observations"

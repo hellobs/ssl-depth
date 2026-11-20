@@ -8,6 +8,14 @@
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import random
@@ -22,12 +30,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-sys.path.insert(0, "D:/zzr/microwm/src")
+sys.path.insert(0, f"{MICROW}/src")
 sys.path.insert(0, str(Path(__file__).parent))
 import probe_data as P  # noqa: E402
 from microwm.models.microwm import MicroJEPA  # noqa: E402
 
-CACHE = Path("D:/zzr/ssl-depth/cache/kept80.json")
+CACHE = Path(f"{REPO}/cache/kept80.json")
 MIN_VALID = 0.50
 MAX_DEPTH = 80.0
 
@@ -62,7 +70,7 @@ def split(idx: dict, seed: int = 0):
 class DepthFrames(Dataset):
     def __init__(self, idx: dict, episodes: list[str]):
         self.items = [(e, s) for e in episodes for s in idx["kept"][e]]
-        self.root = Path("D:/zzr/wmdata/runs")
+        self.root = Path(f"{DATA}/runs")
 
     def __len__(self):
         return len(self.items)
@@ -147,7 +155,7 @@ def main():
     ap.add_argument("--epochs", type=int, default=20)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--lr", type=float, default=3e-4)
-    ap.add_argument("--out", default="D:/zzr/ssl-depth/runs/min3")
+    ap.add_argument("--out", default=f"{REPO}/runs/min3")
     a = ap.parse_args()
 
     dev = "cuda"

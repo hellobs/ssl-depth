@@ -16,6 +16,14 @@
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import random
@@ -28,21 +36,21 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-sys.path.insert(0, "D:/zzr/microwm/src")
+sys.path.insert(0, f"{MICROW}/src")
 from microwm.models.microwm import MicroJEPA  # noqa: E402
 
 # 与 diag_backbone.py 同源：六批数据分处不同根目录，按存在性定位。
-ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
-         Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
-         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/wmdata/near_out"),
-         Path("D:/zzr/wmdata/runs_batch5"), Path("D:/zzr/wmdata/runs_batch6"),
-         Path("D:/zzr/wmdata/runs_batch7"), Path("D:/zzr/wmdata/runs_b8_newgoal"),
-         Path("D:/zzr/wmdata/runs_other_ai"),
+ROOTS = [Path(f"{DATA}/runs"), Path(f"{DATA}/runs_batch2"),
+         Path(f"{DATA}/runs_batch3"), Path(f"{DATA}/runs_batch4"),
+         Path(f"{DATA}/runs_nearfield"), Path(f"{DATA}/near_out"),
+         Path(f"{DATA}/runs_batch5"), Path(f"{DATA}/runs_batch6"),
+         Path(f"{DATA}/runs_batch7"), Path(f"{DATA}/runs_b8_newgoal"),
+         Path(f"{DATA}/runs_other_ai"),
          # 2026-11-20 新增：近场补采两轮（near_out3/4）与合作方的三批高空巡航（b11）。
          # 与 v5 的 train/val/test 零重叠，已在加入前逐段核对。
-         Path("D:/zzr/wmdata/near_out3"), Path("D:/zzr/wmdata/near_out4"),
-         Path("D:/zzr/wmdata/runs_b11_alt20"), Path("D:/zzr/wmdata/runs_b11_alt40"),
-         Path("D:/zzr/wmdata/runs_b11_newgoal")]
+         Path(f"{DATA}/near_out3"), Path(f"{DATA}/near_out4"),
+         Path(f"{DATA}/runs_b11_alt20"), Path(f"{DATA}/runs_b11_alt40"),
+         Path(f"{DATA}/runs_b11_newgoal")]
 OBS = "observations"
 
 # 下游 JepaBackbone 的规格（= diag_backbone.JEPA_CFG）。位置编码是定长相加，
@@ -54,11 +62,11 @@ DOWNSTREAM = {"img_h": 108, "img_w": 192, "patch": 6, "dim": 192,
 # 评测划分的唯一权威来源：v4 训练时写下的 split。
 # 不能现算，也不能用 cache/kept_all.json —— 索引在训练之后重建过
 # （补采 9 段、清理 3 段），kept_all 是 104 段，而论文用的是 98 段，两套不同。
-V4_SPLIT = Path("D:/zzr/ssl-depth/runs/v4_imagenet/metrics.json")
+V4_SPLIT = Path(f"{REPO}/runs/v4_imagenet/metrics.json")
 
 # 只评测、永不训练的数据（例如新采的外部验收集）。v4 的留出集管不到它们，
 # 所以必须单独声明，否则"断言通过"只是假象。
-HELD_OUT_ONLY = Path("D:/zzr/ssl-depth/runs/held_out_only.txt")
+HELD_OUT_ONLY = Path(f"{REPO}/runs/held_out_only.txt")
 
 
 def load_held_out_only(p: Path = HELD_OUT_ONLY) -> tuple[set[str], set[str]]:
@@ -230,14 +238,14 @@ def main():
     ap.add_argument("--gap", type=int, default=1,
                     help="帧对间隔。1=相邻帧（0.2 秒），4~5 才逼模型学运动")
     ap.add_argument("--smoke", action="store_true", help="3 步、64px、CPU，只验通路")
-    ap.add_argument("--out", default="D:/zzr/ssl-depth/runs/jepa_domain_clean",
+    ap.add_argument("--out", default=f"{REPO}/runs/jepa_domain_clean",
                     help="默认写到 clean 目录；别写回 runs/jepa_domain，那个路径曾是泄漏版")
     a = ap.parse_args()
 
     if a.smoke:
         a.img_h, a.img_w, a.patch, a.dim, a.depth, a.heads = 108, 192, 6, 96, 2, 4
         a.epochs, a.steps, a.batch, a.limit = 1, 0, 2, 6
-        a.out = "D:/zzr/ssl-depth/runs/smoke_jepa"
+        a.out = f"{REPO}/runs/smoke_jepa"
         dev = "cpu"
     else:
         dev = "cuda" if torch.cuda.is_available() else "cpu"

@@ -24,6 +24,14 @@ cache/loop_labels_report.json  统计：解决率、冲突率、重复标注一�
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import statistics
@@ -33,15 +41,15 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path("D:/zzr/ssl-depth")
+ROOT = Path(f"{REPO}")
 REVIEWS = ROOT / "review" / "reviews.jsonl"
 OUT_LABELS = ROOT / "cache" / "loop_labels.jsonl"
 OUT_REPORT = ROOT / "cache" / "loop_labels_report.json"
 
-ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
-         Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
-         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/wmdata/near_out"),
-         Path("D:/zzr/wmdata/near_out2")]
+ROOTS = [Path(f"{DATA}/runs"), Path(f"{DATA}/runs_batch2"),
+         Path(f"{DATA}/runs_batch3"), Path(f"{DATA}/runs_batch4"),
+         Path(f"{DATA}/runs_nearfield"), Path(f"{DATA}/near_out"),
+         Path(f"{DATA}/near_out2")]
 
 POSITIVE = {"accept"}          # 人认为这次触发成立
 NEGATIVE = {"reject"}          # 人认为不该触发

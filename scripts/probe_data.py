@@ -9,6 +9,14 @@
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import re
@@ -18,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-RUNS = Path("D:/zzr/wmdata/runs")
+RUNS = Path(f"{DATA}/runs")
 OBS_RE = re.compile(r"^(\d{6})_front_rgb\.png$")
 
 

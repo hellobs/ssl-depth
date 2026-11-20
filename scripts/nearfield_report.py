@@ -5,10 +5,18 @@
 内有效深度的 5% 分位。阈值取避障判据常用的 6/9/12/15/20 米。
 
 用法：
-  python scripts/nearfield_report.py --root D:/zzr/wmdata/near_out2
-  python scripts/nearfield_report.py --root D:/zzr/wmdata/near_out2 --json out.json
+  python scripts/nearfield_report.py --root $WM_DATA_ROOT/near_out2
+  python scripts/nearfield_report.py --root $WM_DATA_ROOT/near_out2 --json out.json
 """
 from __future__ import annotations
+
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
 
 import argparse
 import json

@@ -14,10 +14,18 @@ run 级排除：预训练脚本的泄漏断言是 run 级的（某个 run 只要
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import json
 from pathlib import Path
 
-ROOT = Path("D:/zzr/ssl-depth")
+ROOT = Path(f"{REPO}")
 V4 = ROOT / "runs/v4_imagenet/metrics.json"
 IDX = ROOT / "cache/kept_all_v5.json"
 HELD = ROOT / "runs/held_out_only.txt"

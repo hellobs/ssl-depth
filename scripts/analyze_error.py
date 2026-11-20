@@ -5,6 +5,14 @@
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import sys
@@ -15,11 +23,11 @@ import numpy as np
 import torch
 import torch.utils.data as tud
 
-sys.path.insert(0, "D:/zzr/ssl-depth/scripts")
+sys.path.insert(0, f"{REPO}/scripts")
 from diag_backbone import (CACHE, CKPTS, DepthHead, Frames, JepaBackbone,  # noqa
                            ResnetBackbone, load_split)
 
-ROOT = Path("D:/zzr/ssl-depth")
+ROOT = Path(f"{REPO}")
 BINS = [(0, 10), (10, 20), (20, 40), (40, 81)]
 
 

@@ -41,6 +41,14 @@ requires_grad=False，不浪费计算。
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import sys
@@ -58,7 +66,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from diag_backbone import IMG_H, IMG_W, MAX_DEPTH, MIN_DEPTH, DepthHead, Frames, find_obs  # noqa: E402
 from task_metric import front_near  # noqa: E402
 
-ROOT = Path("D:/zzr/ssl-depth")
+ROOT = Path(f"{REPO}")
 LABELS = ROOT / "cache" / "loop_labels.jsonl"
 
 
@@ -319,7 +327,7 @@ def main() -> int:
     ap.add_argument("--near-limit", type=int, default=0)
     ap.add_argument("--near-weight", type=float, default=1.0,
                     help="近场帧在训练里的重复采样次数")
-    ap.add_argument("--eval-root", default="D:/zzr/wmdata/near_out2")
+    ap.add_argument("--eval-root", default=f"{DATA}/near_out2")
     ap.add_argument("--eval-limit", type=int, default=256)
     ap.add_argument("--ckpt", default=None, help="本管线训练出的权重")
     ap.add_argument("--backbone-ckpt", default=str(ROOT / "runs/jepa_domain_v5/jepa.pt"),

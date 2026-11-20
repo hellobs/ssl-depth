@@ -9,6 +9,14 @@
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import json
 import sys
 from pathlib import Path
@@ -17,12 +25,12 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-sys.path.insert(0, "D:/zzr/ssl-depth/scripts")
+sys.path.insert(0, f"{REPO}/scripts")
 from diag_backbone import (CACHE, DepthHead, Frames, JepaBackbone,  # noqa: E402
                            ResnetBackbone, split)
 
 THRESHOLDS = [6.0, 9.0, 12.0, 15.0, 20.0]
-ROOT = Path("D:/zzr/ssl-depth")
+ROOT = Path(f"{REPO}")
 
 
 def front_near(depth: np.ndarray) -> float:

@@ -21,6 +21,14 @@ ZoeDepth 这类直接输出米制的模型跳过这一步。
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import os
@@ -34,13 +42,13 @@ from scipy.stats import spearmanr
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
-ROOT = Path("D:/zzr/ssl-depth")
+ROOT = Path(f"{REPO}")
 SPLIT = ROOT / "runs/v5_split.json"
 ROOTS = [Path(p) for p in [
-    "D:/zzr/wmdata/runs", "D:/zzr/wmdata/runs_batch2", "D:/zzr/wmdata/runs_batch3",
-    "D:/zzr/wmdata/runs_batch4", "D:/zzr/wmdata/runs_batch5", "D:/zzr/wmdata/runs_batch6",
-    "D:/zzr/wmdata/runs_batch7", "D:/zzr/wmdata/runs_b8_newgoal", "D:/zzr/wmdata/runs_nearfield",
-    "D:/zzr/wmdata/runs_other_ai", "D:/zzr/wmdata/near_out"]]
+    f"{DATA}/runs", f"{DATA}/runs_batch2", f"{DATA}/runs_batch3",
+    f"{DATA}/runs_batch4", f"{DATA}/runs_batch5", f"{DATA}/runs_batch6",
+    f"{DATA}/runs_batch7", f"{DATA}/runs_b8_newgoal", f"{DATA}/runs_nearfield",
+    f"{DATA}/runs_other_ai", f"{DATA}/near_out"]]
 MIN_D, MAX_D = 0.5, 80.0
 
 

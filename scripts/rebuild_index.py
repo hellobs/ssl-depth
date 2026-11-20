@@ -8,6 +8,14 @@ v5 索引写到 `cache/kept_all_v5.json`，不覆盖 v4 的。
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import glob
 import json
@@ -15,13 +23,13 @@ from pathlib import Path
 
 import numpy as np
 
-ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
-         Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
-         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/wmdata/near_out")]
-EXTRA_ROOTS = [Path("D:/zzr/wmdata/runs_batch5"), Path("D:/zzr/wmdata/runs_batch6"),
-               Path("D:/zzr/wmdata/runs_batch7"), Path("D:/zzr/wmdata/runs_b8_newgoal"),
-               Path("D:/zzr/wmdata/runs_other_ai")]
-OUT = Path("D:/zzr/ssl-depth/cache/kept_all.json")
+ROOTS = [Path(f"{DATA}/runs"), Path(f"{DATA}/runs_batch2"),
+         Path(f"{DATA}/runs_batch3"), Path(f"{DATA}/runs_batch4"),
+         Path(f"{DATA}/runs_nearfield"), Path(f"{DATA}/near_out")]
+EXTRA_ROOTS = [Path(f"{DATA}/runs_batch5"), Path(f"{DATA}/runs_batch6"),
+               Path(f"{DATA}/runs_batch7"), Path(f"{DATA}/runs_b8_newgoal"),
+               Path(f"{DATA}/runs_other_ai")]
+OUT = Path(f"{REPO}/cache/kept_all.json")
 MIN_VALID, MAX_DEPTH = 0.50, 80.0
 
 ap = argparse.ArgumentParser()

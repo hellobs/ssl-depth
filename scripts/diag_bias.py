@@ -8,6 +8,14 @@
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import sys
@@ -15,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, "D:/zzr/ssl-depth/scripts")
+sys.path.insert(0, f"{REPO}/scripts")
 from task_metric import CACHE, ROOT, build, collect  # noqa: E402
 
 

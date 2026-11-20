@@ -9,6 +9,14 @@
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import argparse
 import json
 import sys
@@ -17,8 +25,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-sys.path.insert(0, "D:/zzr/ssl-depth/scripts")
-sys.path.insert(0, "D:/zzr/microwm/src")
+sys.path.insert(0, f"{REPO}/scripts")
+sys.path.insert(0, f"{MICROW}/src")
 
 from diag_backbone import (CACHE, CKPTS, DepthHead, Frames, JepaBackbone,  # noqa: E402
                            ResnetBackbone, load_split)

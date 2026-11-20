@@ -1,5 +1,13 @@
 """论文配图，统一视觉规范。"""
 from __future__ import annotations
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import json
 from pathlib import Path
 import matplotlib
@@ -11,7 +19,7 @@ plt.rcParams["font.sans-serif"] = ["SimHei"]
 plt.rcParams["axes.unicode_minus"] = False
 plt.rcParams["font.size"] = 9
 
-ROOT = Path("D:/zzr/ssl-depth")
+ROOT = Path(f"{REPO}")
 OUT = ROOT / "paper" / "figs"
 OUT.mkdir(parents=True, exist_ok=True)
 

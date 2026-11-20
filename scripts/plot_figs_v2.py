@@ -8,6 +8,14 @@ SimHei 只有常规字重，全部文字不加粗，层级靠字号与颜色深�
 """
 from __future__ import annotations
 
+# --- 路径解析（不写死本机绝对路径）---
+import os as _os
+from pathlib import Path as _Path
+REPO = str(_Path(__file__).resolve().parents[1])
+DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().parents[2] / "wmdata")))
+MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
+# ---
+
 import json
 import math
 from pathlib import Path
@@ -27,7 +35,7 @@ plt.rcParams["figure.facecolor"] = "white"
 plt.rcParams["axes.facecolor"] = "white"
 plt.rcParams["savefig.facecolor"] = "white"
 
-ROOT = Path("D:/zzr/ssl-depth")
+ROOT = Path(f"{REPO}")
 OUT = ROOT / "paper" / "figs"
 # 默认画 v5（论文主表口径）；要重画旧版就 python scripts/plot_figs_v2.py v4_imagenet
 import sys as _sys  # noqa: E402
