@@ -2,10 +2,6 @@
 
 无人机单目深度测距的误差分析与设计研究。课程论文项目，配套代码与可复现的结果。
 
-论文：《基于人工智能的无人机单目深度测距：误差研究与设计学分析》（`paper/main.pdf`）
-
-作者：课程项目组（成员信息见论文首页）
-
 ## 研究问题
 
 配送无人机要从单张图像判断前方障碍的距离。按 LeCun 的表述，自主智能的核心是世界模型：系统在学到的表征空间里预测下一状态，而不是重建像素。这条路在窄任务上能兑现多少，需要量出来。
@@ -167,16 +163,6 @@ python scripts/review_app.py
 可用的特征提取网络：`imagenet`、`resnet_scratch`、`scratch`、`jepa_domain_v6`。
 
 预训练的超参默认值就是下游规格（108×192、patch 6、dim 192、heads 3、576 token）。位置编码是定长相加、不插值，token 数差一个会在加载时被形状过滤掉且不报错，脚本存盘后会做一次 `verify_loadable` 自检。
-
-## 论文编译
-
-```bash
-cd paper
-xelatex main.tex
-xelatex main.tex
-```
-
-需要 TeXLive（含 ctex）与 SimSun、SimHei 字体。
 
 ## 已知限制
 
