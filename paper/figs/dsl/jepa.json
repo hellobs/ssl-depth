@@ -1,0 +1,160 @@
+{
+ "schema": "scifig/v1",
+ "meta": {
+  "title": "Joint-Embedding Predictive Architecture (MicroJEPA)",
+  "preset": "screen",
+  "direction": "LR",
+  "locale": "en"
+ },
+ "style": {
+  "fontStack": "Arial, Helvetica, Liberation Sans, sans-serif",
+  "palette": "okabe-ito",
+  "fontSize": {
+   "body": 8,
+   "small": 6.5
+  }
+ },
+ "nodes": [
+  {
+   "id": "it",
+   "shape": "parallelogram",
+   "label": "Image t",
+   "role": "input",
+   "position": {
+    "x": 39,
+    "y": 55
+   }
+  },
+  {
+   "id": "ctx",
+   "shape": "round",
+   "label": "Context Encoder\n(updated)",
+   "role": "primary",
+   "position": {
+    "x": 168,
+    "y": 55
+   }
+  },
+  {
+   "id": "zt",
+   "shape": "rect",
+   "label": "z(t)",
+   "role": "primary",
+   "position": {
+    "x": 296,
+    "y": 55
+   }
+  },
+  {
+   "id": "pred",
+   "shape": "round",
+   "label": "Predictor\n(updated)",
+   "role": "secondary",
+   "position": {
+    "x": 425,
+    "y": 55
+   }
+  },
+  {
+   "id": "zh",
+   "shape": "rect",
+   "label": "pred",
+   "role": "secondary",
+   "position": {
+    "x": 554,
+    "y": 55
+   }
+  },
+  {
+   "id": "it1",
+   "shape": "parallelogram",
+   "label": "Image t+1",
+   "role": "input",
+   "position": {
+    "x": 39,
+    "y": 185
+   }
+  },
+  {
+   "id": "tgt",
+   "shape": "round",
+   "label": "Target Encoder\n(EMA, frozen)",
+   "role": "accent",
+   "position": {
+    "x": 168,
+    "y": 185
+   }
+  },
+  {
+   "id": "z1",
+   "shape": "rect",
+   "label": "z(t+1)",
+   "role": "accent",
+   "position": {
+    "x": 296,
+    "y": 185
+   }
+  },
+  {
+   "id": "loss",
+   "shape": "rect",
+   "label": "L1 Loss\n(embedding only)",
+   "role": "output",
+   "position": {
+    "x": 694,
+    "y": 120
+   }
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "from": "it",
+   "to": "ctx",
+   "kind": "arrow"
+  },
+  {
+   "id": "e2",
+   "from": "ctx",
+   "to": "zt",
+   "kind": "arrow"
+  },
+  {
+   "id": "e3",
+   "from": "zt",
+   "to": "pred",
+   "kind": "arrow"
+  },
+  {
+   "id": "e4",
+   "from": "pred",
+   "to": "zh",
+   "kind": "arrow"
+  },
+  {
+   "id": "e5",
+   "from": "zh",
+   "to": "loss",
+   "kind": "arrow"
+  },
+  {
+   "id": "e6",
+   "from": "it1",
+   "to": "tgt",
+   "kind": "arrow"
+  },
+  {
+   "id": "e7",
+   "from": "tgt",
+   "to": "z1",
+   "kind": "arrow"
+  },
+  {
+   "id": "e8",
+   "from": "z1",
+   "to": "loss",
+   "kind": "dashed",
+   "label": "no grad"
+  }
+ ]
+}

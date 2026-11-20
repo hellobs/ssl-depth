@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140mm" height="107.69mm" viewBox="0 0 529.13 407.03">
+<desc><![CDATA[{"schema":"sciplot/v2","version":"1.2.0","specSha":"cd056a6b05ba380855b429c0deb651637c1c612c97a9918a08a359e572efb20c"}]]></desc>
+<title>Per-flight error: four best and four worst</title>
+<text x="264.57" y="9.33" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" font-weight="700" fill="#222222">Per-flight error: four best and four worst</text>
+<line x1="39.97" y1="367.66" x2="519.13" y2="367.66" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="299.94" x2="519.13" y2="299.94" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="232.22" x2="519.13" y2="232.22" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="164.5" x2="519.13" y2="164.5" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="96.79" x2="519.13" y2="96.79" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="29.07" x2="519.13" y2="29.07" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="367.66" x2="519.13" y2="367.66" stroke="#222222" stroke-width="0.8"/>
+<line x1="69.92" y1="367.66" x2="69.92" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="69.92" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">F1 b11c9</text>
+<line x1="129.81" y1="367.66" x2="129.81" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="129.81" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">F2 46bcd</text>
+<line x1="189.71" y1="367.66" x2="189.71" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="189.71" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">F3 d7a82</text>
+<line x1="249.6" y1="367.66" x2="249.6" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="249.6" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">F4 8c4ef</text>
+<line x1="309.5" y1="367.66" x2="309.5" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="309.5" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">F5 28071</text>
+<line x1="369.39" y1="367.66" x2="369.39" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="369.39" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">F6 27350</text>
+<line x1="429.29" y1="367.66" x2="429.29" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="429.29" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">F7 225f6</text>
+<line x1="489.19" y1="367.66" x2="489.19" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="489.19" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">F8 d7858</text>
+<line x1="39.97" y1="29.07" x2="39.97" y2="367.66" stroke="#222222" stroke-width="0.8"/>
+<line x1="36.47" y1="367.66" x2="39.97" y2="367.66" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="370.46" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0</text>
+<line x1="36.47" y1="299.94" x2="39.97" y2="299.94" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="302.74" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0.1</text>
+<line x1="36.47" y1="232.22" x2="39.97" y2="232.22" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="235.02" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0.2</text>
+<line x1="36.47" y1="164.5" x2="39.97" y2="164.5" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="167.3" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0.3</text>
+<line x1="36.47" y1="96.79" x2="39.97" y2="96.79" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="99.59" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0.4</text>
+<line x1="36.47" y1="29.07" x2="39.97" y2="29.07" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="31.87" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0.5</text>
+<text x="279.55" y="402.36" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222">Flight (F1-F4: lowest error, F5-F8: highest)</text>
+<text x="5.6" y="198.36" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222" transform="rotate(-90 5.6 198.36)">AbsRel</text>
+<rect data-scifig="series" data-s="0" x="49.79" y="325" width="40.25" height="42.66" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="109.69" y="322.22" width="40.25" height="45.44" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="169.58" y="319.38" width="40.25" height="48.28" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="229.48" y="313.28" width="40.25" height="54.38" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="289.37" y="204.32" width="40.25" height="163.34" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="349.27" y="152.65" width="40.25" height="215.01" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="409.17" y="149.94" width="40.25" height="217.72" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="469.06" y="85.54" width="40.25" height="282.12" fill="#0072B2" stroke="none"/>
+<metadata data-scifig="trace"><![CDATA[{"specSha":"cd056a6b05ba380855b429c0deb651637c1c612c97a9918a08a359e572efb20c","version":"1.2.0","schema":"sciplot/v2","trace":[{"kind":"bar","s":0,"i":0,"vx":0,"vy":0.063,"px":69.91586614173228,"py":324.99669650716737,"axis":"y"},{"kind":"bar","s":0,"i":1,"vx":1,"vy":0.0671,"px":129.81159842519685,"py":322.2202362729659,"axis":"y"},{"kind":"bar","s":0,"i":2,"vx":2,"vy":0.0713,"px":189.70733070866143,"py":319.37605749646684,"axis":"y"},{"kind":"bar","s":0,"i":3,"vx":3,"vy":0.0803,"px":249.60306299212598,"py":313.28138868968307,"axis":"y"},{"kind":"bar","s":0,"i":4,"vx":4,"vy":0.2412,"px":309.49879527559057,"py":204.3222541328488,"axis":"y"},{"kind":"bar","s":0,"i":5,"vx":5,"vy":0.3175,"px":369.3945275590552,"py":152.65300635978195,"axis":"y"},{"kind":"bar","s":0,"i":6,"vx":6,"vy":0.3215,"px":429.29025984251973,"py":149.94426466787806,"axis":"y"},{"kind":"bar","s":0,"i":7,"vx":7,"vy":0.4166,"px":489.18599212598434,"py":85.54393094286291,"axis":"y"}]}]]></metadata>
+</svg>

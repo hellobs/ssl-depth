@@ -1,0 +1,65 @@
+{
+ "schema": "sciplot/v2",
+ "type": "line",
+ "meta": {
+  "title": "Threshold sweep: recall and false triggers",
+  "preset": "elsevier-1-5",
+  "aspect": 1.3
+ },
+ "data": {
+  "series": [
+   {
+    "name": "Recall (%)",
+    "x": [
+     6.0,
+     9.0,
+     12.0,
+     15.0,
+     20.0
+    ],
+    "y": [
+     67.5,
+     78.1,
+     97.0,
+     99.0,
+     96.0
+    ]
+   },
+   {
+    "name": "False triggers",
+    "x": [
+     6.0,
+     9.0,
+     12.0,
+     15.0,
+     20.0
+    ],
+    "y": [
+     8,
+     11,
+     6,
+     40,
+     43
+    ],
+    "axis": "y2"
+   }
+  ]
+ },
+ "axes": {
+  "x": {
+   "label": "Clearance threshold (m)"
+  },
+  "y": {
+   "label": "Recall (%)",
+   "min": 50,
+   "max": 100
+  },
+  "y2": {
+   "label": "False triggers (frames)"
+  }
+ },
+ "legend": {
+  "show": true,
+  "position": "top"
+ }
+}

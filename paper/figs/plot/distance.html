@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SciPlot 预览</title>
+<style>
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #f4f4f4; color: #222; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
+  .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .meta { font-size: 12px; color: #888; margin-bottom: 12px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  button { font: inherit; font-size: 13px; padding: 7px 14px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; color: #222; }
+  button:hover { border-color: #0072B2; color: #0072B2; }
+  button.primary { background: #0072B2; border-color: #0072B2; color: #fff; }
+  button.primary:hover { opacity: .9; color: #fff; }
+  .spacer { flex: 1; }
+  .dpi-label { font-size: 12px; color: #888; display: flex; align-items: center; gap: 4px; }
+  .dpi-label select { font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid #ddd; border-radius: 5px; }
+  .figure { background: #fff; display: flex; justify-content: center; }
+  .figure svg { max-width: 100%; height: auto; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; font-size: 13px; color: #555; }
+  pre { background: #f6f8fa; border-radius: 6px; padding: 12px; font-size: 11px; overflow: auto; }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1f2329; color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1 id="title">SCI 统计图预览</h1>
+    <div class="meta" id="meta"></div>
+    <div class="toolbar">
+      <span class="spacer"></span>
+      <label class="dpi-label">DPI
+        <select id="dpi-select">
+          <option value="300">300</option>
+          <option value="600" selected>600</option>
+          <option value="1200">1200</option>
+        </select>
+      </label>
+      <button class="primary" id="btn-png">导出 PNG</button>
+      <button id="btn-tiff">导出 TIFF</button>
+      <button id="btn-svg">下载 SVG</button>
+    </div>
+    <div class="figure" id="figure"></div>
+    <details>
+      <summary>查看 plot spec（JSON）</summary>
+      <pre id="spec"></pre>
+    </details>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+/* SciTiff：极简 TIFF 编码器（纯 JS，零依赖，Node / 浏览器通用 UMD）
+ *
+ * 输入 RGBA 像素 + 宽高，输出 RGB + PackBits 无损压缩的 TIFF 字节流（little-endian）。
+ * 供 sci-diagram / sci-statchart 的「导出 TIFF」共用——Node 侧用 @resvg/resvg-js 的
+ * render().pixels 喂进来，浏览器侧用 canvas getImageData 喂进来。
+ *
+ * 输出格式：RGB(Photometric=2) + PackBits(Compression=32773) + 分辨率单位 inch，
+ * 是期刊普遍接受的无损 TIFF（Photoshop/ImageMagick/预览均可打开）。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.SciTiff = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // PackBits 压缩（RFC 1951 无关的 TIFF PackBits，按字节行）
+  // run(2..128 相同字节) -> 控制字节 257-n + 1 字节
+  // literal(1..128 不同字节) -> 控制字节 n-1 + n 字节
+  function packBits(src) {
+    var n = src.length;
+    var out = new Uint8Array(n + Math.ceil(n / 128) + 16);
+    var p = 0, i = 0;
+    while (i < n) {
+      var run = 1;
+      while (i + run < n && src[i + run] === src[i] && run < 128) run++;
+      if (run >= 2) {
+        out[p++] = 257 - run;
+        out[p++] = src[i];
+        i += run;
+      } else {
+        var start = i, lit = 0;
+        while (i < n && lit < 128) {
+          if (i + 1 < n && src[i] === src[i + 1]) break;
+          i++; lit++;
+        }
+        out[p++] = lit - 1;
+        for (var k = 0; k < lit; k++) out[p++] = src[start + k];
+      }
+    }
+    return out.slice(0, p);
+  }
+
+  // width, height: 像素尺寸；rgba: Uint8Array，长度 width*height*4，逐像素 R,G,B,A
+  // opts: { dpi: 600 }（写入 XResolution/YResolution）
+  function encodeTiff(width, height, rgba, opts) {
+    opts = opts || {};
+    var dpi = opts.dpi || 600;
+    var px = width * height;
+
+    // RGBA -> RGB（白底合成，避免透明导致 TIFF 出现黑底）
+    var rgb = new Uint8Array(px * 3);
+    for (var i = 0, j = 0; i < px; i++, j += 3) {
+      var r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2], a = rgba[i * 4 + 3];
+      if (a === 255) { rgb[j] = r; rgb[j + 1] = g; rgb[j + 2] = b; }
+      else if (a === 0) { rgb[j] = 255; rgb[j + 1] = 255; rgb[j + 2] = 255; }
+      else {
+        var f = a / 255;
+        rgb[j] = Math.round(r * f + 255 * (1 - f));
+        rgb[j + 1] = Math.round(g * f + 255 * (1 - f));
+        rgb[j + 2] = Math.round(b * f + 255 * (1 - f));
+      }
+    }
+
+    // TIFF PackBits 规范：每一扫描行（row）独立压缩后按序拼接，不得跨行连续压。
+    var rowBytes = width * 3;
+    var packed = [];
+    var packedTotal = 0;
+    for (var y = 0; y < height; y++) {
+      var pr = packBits(rgb.subarray(y * rowBytes, (y + 1) * rowBytes));
+      packed.push(pr);
+      packedTotal += pr.length;
+    }
+
+    var N = 12;                       // IFD 条目数
+    var IFD_START = 8;                // 头 8 字节
+    var IFD_LEN = 2 + N * 12 + 4;     // count + entries + nextIFD = 150
+    var BPS_OFF = IFD_START + IFD_LEN;        // 158：BitsPerSample[8,8,8] 6 字节
+    var XRES_OFF = BPS_OFF + 6;               // 164：XResolution 8 字节
+    var YRES_OFF = XRES_OFF + 8;              // 172：YResolution 8 字节
+    var STRIP_OFF = YRES_OFF + 8;             // 180：像素数据起点
+
+    var total = STRIP_OFF + packedTotal;
+    var buf = new Uint8Array(total);
+    var dv = new DataView(buf.buffer);
+
+    buf[0] = 0x49; buf[1] = 0x49;             // "II" 小端
+    dv.setUint16(2, 42, true);
+    dv.setUint32(4, IFD_START, true);
+
+    dv.setUint16(IFD_START, N, true);
+    var e = IFD_START + 2;
+    function entry(tag, type, count, value) {
+      dv.setUint16(e, tag, true);
+      dv.setUint16(e + 2, type, true);
+      dv.setUint32(e + 4, count, true);
+      if (type === 3 && count === 1) dv.setUint16(e + 8, value, true);  // SHORT 内联
+      else dv.setUint32(e + 8, value, true);                            // LONG 内联 / 偏移
+      e += 12;
+    }
+    entry(256, 4, 1, width);          // ImageWidth
+    entry(257, 4, 1, height);         // ImageLength
+    entry(258, 3, 3, BPS_OFF);        // BitsPerSample = [8,8,8]
+    entry(259, 3, 1, 32773);          // Compression = PackBits
+    entry(262, 3, 1, 2);              // PhotometricInterpretation = RGB
+    entry(273, 4, 1, STRIP_OFF);      // StripOffsets
+    entry(277, 3, 1, 3);              // SamplesPerPixel = 3
+    entry(278, 4, 1, height);         // RowsPerStrip
+    entry(279, 4, 1, packedTotal);    // StripByteCounts
+    entry(282, 5, 1, XRES_OFF);       // XResolution = dpi/1
+    entry(283, 5, 1, YRES_OFF);       // YResolution = dpi/1
+    entry(296, 3, 1, 2);              // ResolutionUnit = inch
+    dv.setUint32(e, 0, true);         // next IFD = 0
+
+    dv.setUint16(BPS_OFF, 8, true);
+    dv.setUint16(BPS_OFF + 2, 8, true);
+    dv.setUint16(BPS_OFF + 4, 8, true);
+    dv.setUint32(XRES_OFF, dpi, true);
+    dv.setUint32(XRES_OFF + 4, 1, true);
+    dv.setUint32(YRES_OFF, dpi, true);
+    dv.setUint32(YRES_OFF + 4, 1, true);
+
+    var off = STRIP_OFF;
+    for (var ri = 0; ri < packed.length; ri++) {
+      buf.set(packed[ri], off);
+      off += packed[ri].length;
+    }
+    return buf;
+  }
+
+  return { encodeTiff: encodeTiff, packBits: packBits };
+});
+
+</script>
+<script>
+(function () {
+  var svgStr = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"140mm\" height=\"112mm\" viewBox=\"0 0 529.13 423.31\">\n<desc><![CDATA[{\"schema\":\"sciplot/v2\",\"version\":\"1.2.0\",\"specSha\":\"e4ffcf12b08158a03907c698b97c592631b900e825944534a2bc389882ed4837\"}]]></desc>\n<title>Depth accuracy by ground-truth distance</title>\n<text x=\"264.57\" y=\"9.33\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"7pt\" font-weight=\"700\" fill=\"#222222\">Depth accuracy by ground-truth distance</text>\n<line x1=\"39.97\" y1=\"383.94\" x2=\"519.13\" y2=\"383.94\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<line x1=\"39.97\" y1=\"317.18\" x2=\"519.13\" y2=\"317.18\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<line x1=\"39.97\" y1=\"250.42\" x2=\"519.13\" y2=\"250.42\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<line x1=\"39.97\" y1=\"183.66\" x2=\"519.13\" y2=\"183.66\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<line x1=\"39.97\" y1=\"116.89\" x2=\"519.13\" y2=\"116.89\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<line x1=\"39.97\" y1=\"50.13\" x2=\"519.13\" y2=\"50.13\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<line x1=\"39.97\" y1=\"383.94\" x2=\"519.13\" y2=\"383.94\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<line x1=\"99.86\" y1=\"383.94\" x2=\"99.86\" y2=\"387.44\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"99.86\" y=\"393.84\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">0-10 m</text>\n<line x1=\"219.66\" y1=\"383.94\" x2=\"219.66\" y2=\"387.44\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"219.66\" y=\"393.84\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">10-20 m</text>\n<line x1=\"339.45\" y1=\"383.94\" x2=\"339.45\" y2=\"387.44\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"339.45\" y=\"393.84\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">20-40 m</text>\n<line x1=\"459.24\" y1=\"383.94\" x2=\"459.24\" y2=\"387.44\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"459.24\" y=\"393.84\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">40-80 m</text>\n<line x1=\"39.97\" y1=\"50.13\" x2=\"39.97\" y2=\"383.94\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<line x1=\"36.47\" y1=\"383.94\" x2=\"39.97\" y2=\"383.94\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"33.47\" y=\"386.74\" text-anchor=\"end\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">0</text>\n<line x1=\"36.47\" y1=\"317.18\" x2=\"39.97\" y2=\"317.18\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"33.47\" y=\"319.98\" text-anchor=\"end\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">0.2</text>\n<line x1=\"36.47\" y1=\"250.42\" x2=\"39.97\" y2=\"250.42\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"33.47\" y=\"253.22\" text-anchor=\"end\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">0.4</text>\n<line x1=\"36.47\" y1=\"183.66\" x2=\"39.97\" y2=\"183.66\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"33.47\" y=\"186.46\" text-anchor=\"end\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">0.6</text>\n<line x1=\"36.47\" y1=\"116.89\" x2=\"39.97\" y2=\"116.89\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"33.47\" y=\"119.69\" text-anchor=\"end\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">0.8</text>\n<line x1=\"36.47\" y1=\"50.13\" x2=\"39.97\" y2=\"50.13\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"33.47\" y=\"52.93\" text-anchor=\"end\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">1</text>\n<text x=\"279.55\" y=\"418.64\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"7pt\" fill=\"#222222\">Ground-truth distance</text>\n<text x=\"5.6\" y=\"217.04\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"7pt\" fill=\"#222222\" transform=\"rotate(-90 5.6 217.04)\">d1 (within 1.25x)</text>\n<rect data-scifig=\"series\" data-s=\"0\" x=\"55.78\" y=\"139.56\" width=\"40.25\" height=\"244.38\" fill=\"#0072B2\" stroke=\"none\"/>\n<rect data-scifig=\"series\" data-s=\"1\" x=\"103.7\" y=\"265.51\" width=\"40.25\" height=\"118.43\" fill=\"#E69F00\" stroke=\"none\"/>\n<rect data-scifig=\"series\" data-s=\"0\" x=\"175.57\" y=\"93.56\" width=\"40.25\" height=\"290.38\" fill=\"#0072B2\" stroke=\"none\"/>\n<rect data-scifig=\"series\" data-s=\"1\" x=\"223.49\" y=\"340.28\" width=\"40.25\" height=\"43.66\" fill=\"#E69F00\" stroke=\"none\"/>\n<rect data-scifig=\"series\" data-s=\"0\" x=\"295.36\" y=\"90.86\" width=\"40.25\" height=\"293.08\" fill=\"#0072B2\" stroke=\"none\"/>\n<rect data-scifig=\"series\" data-s=\"1\" x=\"343.28\" y=\"348.79\" width=\"40.25\" height=\"35.15\" fill=\"#E69F00\" stroke=\"none\"/>\n<rect data-scifig=\"series\" data-s=\"0\" x=\"415.15\" y=\"90.72\" width=\"40.25\" height=\"293.22\" fill=\"#0072B2\" stroke=\"none\"/>\n<rect data-scifig=\"series\" data-s=\"1\" x=\"463.07\" y=\"346.95\" width=\"40.25\" height=\"36.99\" fill=\"#E69F00\" stroke=\"none\"/>\n<rect x=\"221.33\" y=\"32.6\" width=\"14\" height=\"6\" fill=\"#0072B2\"/>\n<text x=\"237.33\" y=\"38.6\" text-anchor=\"start\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"7pt\" fill=\"#222222\">d1</text>\n<rect x=\"261.71\" y=\"32.6\" width=\"14\" height=\"6\" fill=\"#E69F00\"/>\n<text x=\"277.71\" y=\"38.6\" text-anchor=\"start\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"7pt\" fill=\"#222222\">AbsRel</text>\n<metadata data-scifig=\"trace\"><![CDATA[{\"specSha\":\"e4ffcf12b08158a03907c698b97c592631b900e825944534a2bc389882ed4837\",\"version\":\"1.2.0\",\"schema\":\"sciplot/v2\",\"trace\":[{\"kind\":\"bar\",\"s\":0,\"i\":0,\"vx\":0,\"vy\":0.7321,\"px\":99.86373228346457,\"py\":139.56025183727036,\"axis\":\"y\"},{\"kind\":\"bar\",\"s\":1,\"i\":0,\"vx\":0,\"vy\":0.3548,\"px\":99.86373228346457,\"py\":265.5056656167979,\"axis\":\"y\"},{\"kind\":\"bar\",\"s\":0,\"i\":1,\"vx\":1,\"vy\":0.8699,\"px\":219.65519685039374,\"py\":93.56163530183727,\"axis\":\"y\"},{\"kind\":\"bar\",\"s\":1,\"i\":1,\"vx\":1,\"vy\":0.1308,\"px\":219.65519685039374,\"py\":340.2784530183727,\"axis\":\"y\"},{\"kind\":\"bar\",\"s\":0,\"i\":2,\"vx\":2,\"vy\":0.878,\"px\":339.44666141732284,\"py\":90.85779790026248,\"axis\":\"y\"},{\"kind\":\"bar\",\"s\":1,\"i\":2,\"vx\":2,\"vy\":0.1053,\"px\":339.44666141732284,\"py\":348.79053372703413,\"axis\":\"y\"},{\"kind\":\"bar\",\"s\":0,\"i\":3,\"vx\":3,\"vy\":0.8784,\"px\":459.238125984252,\"py\":90.72427506561684,\"axis\":\"y\"},{\"kind\":\"bar\",\"s\":1,\"i\":3,\"vx\":3,\"vy\":0.1108,\"px\":459.238125984252,\"py\":346.9545947506562,\"axis\":\"y\"}]}]]></metadata>\n</svg>";
+  var spec = {
+  "schema": "sciplot/v2",
+  "type": "bar",
+  "meta": {
+    "title": "Depth accuracy by ground-truth distance",
+    "preset": "elsevier-1-5",
+    "aspect": 1.25
+  },
+  "data": {
+    "labels": [
+      "0-10 m",
+      "10-20 m",
+      "20-40 m",
+      "40-80 m"
+    ],
+    "series": [
+      {
+        "name": "d1",
+        "y": [
+          0.7321,
+          0.8699,
+          0.878,
+          0.8784
+        ]
+      },
+      {
+        "name": "AbsRel",
+        "y": [
+          0.3548,
+          0.1308,
+          0.1053,
+          0.1108
+        ],
+        "axis": "y2"
+      }
+    ]
+  },
+  "axes": {
+    "x": {
+      "label": "Ground-truth distance"
+    },
+    "y": {
+      "label": "d1 (within 1.25x)",
+      "min": 0,
+      "max": 1
+    },
+    "y2": {
+      "label": "AbsRel",
+      "min": 0,
+      "max": 0.5
+    }
+  },
+  "legend": {
+    "show": true,
+    "position": "top"
+  }
+};
+  document.getElementById('figure').innerHTML = svgStr;
+  document.getElementById('title').textContent = (spec.meta && spec.meta.title) || 'SCI 统计图';
+  document.getElementById('meta').textContent =
+    '类型: ' + spec.type + ' · 预设: ' + ((spec.meta && spec.meta.preset) || 'screen');
+  document.getElementById('spec').textContent = JSON.stringify(spec, null, 2);
+
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 2000);
+  }
+  function download(name, content, type) {
+    var blob = new Blob([content], { type: type });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  function svgPhysicalSize(svgStr, dpi) {
+    var wm = svgStr.match(/width="([\d.]+)(mm|in|px)"/);
+    var vb = svgStr.match(/viewBox="[-\d.eE ]+ ([\d.]+) ([\d.]+)"/);
+    var pw;
+    if (wm && wm[2] === 'mm') pw = Math.round(parseFloat(wm[1]) / 25.4 * dpi);
+    else if (wm && wm[2] === 'in') pw = Math.round(parseFloat(wm[1]) * dpi);
+    else if (wm && wm[2] === 'px') pw = Math.round(parseFloat(wm[1]) / 96 * dpi);
+    else if (vb) pw = Math.round(parseFloat(vb[1]) * dpi / 96);
+    else pw = Math.round(8 * dpi);
+    var ph = vb ? Math.round(parseFloat(vb[2]) * pw / parseFloat(vb[1])) : Math.round(pw * 0.75);
+    return { w: pw, h: ph };
+  }
+  function rasterize(svgStr, dpi, cb) {
+    var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function () {
+      var size = svgPhysicalSize(svgStr, dpi);
+      var canvas = document.createElement('canvas');
+      canvas.width = size.w; canvas.height = size.h;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size.w, size.h);
+      ctx.drawImage(img, 0, 0, size.w, size.h);
+      URL.revokeObjectURL(url);
+      cb(canvas, ctx, size);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); toast('SVG 光栅化失败'); };
+    img.src = url;
+  }
+
+  var baseName = ((spec.meta && spec.meta.title) || 'plot').replace(/[^\w\u4e00-\u9fa5-]+/g, '_');
+  var svgFull = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgStr;
+
+  function getDpi() { return parseInt(document.getElementById('dpi-select').value, 10) || 600; }
+  function exportPNG() {
+    var dpi = getDpi();
+    rasterize(svgStr, dpi, function (canvas) {
+      canvas.toBlob(function (blob) { download(baseName + '.png', blob, 'image/png'); }, 'image/png');
+    });
+  }
+  function exportTIFF() {
+    var dpi = getDpi();
+    rasterize(svgStr, dpi, function (canvas, ctx, size) {
+      var data = ctx.getImageData(0, 0, size.w, size.h).data;
+      var buf = SciTiff.encodeTiff(size.w, size.h, data, { dpi: dpi });
+      download(baseName + '.tif', buf, 'image/tiff');
+    });
+  }
+
+  document.getElementById('btn-png').addEventListener('click', exportPNG);
+  document.getElementById('btn-tiff').addEventListener('click', exportTIFF);
+  document.getElementById('btn-svg').addEventListener('click', function () {
+    download(baseName + '.svg', svgFull, 'image/svg+xml');
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SciFig 预览</title>
+<style>
+  :root { --fg:#1f2329; --muted:#6b7280; --line:#e5e7eb; --bg:#f7f8fa; --accent:#0072B2; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; color:var(--fg); background:var(--bg); }
+  header { padding:16px 20px; background:#fff; border-bottom:1px solid var(--line); }
+  header h1 { margin:0 0 4px; font-size:18px; font-weight:600; }
+  header p { margin:0; color:var(--muted); font-size:13px; }
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:12px 20px; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10; }
+  button { font:inherit; font-size:13px; padding:7px 14px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; color:var(--fg); }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.primary:hover { opacity:.9; color:#fff; }
+  .spacer { flex:1; }
+  .dpi-label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px; }
+  .dpi-label select { font:inherit; font-size:12px; padding:4px 6px; border:1px solid var(--line); border-radius:5px; color:var(--fg); }
+  main { padding:20px; }
+  #canvas-wrap { overflow:auto; background:#fff; border:1px solid var(--line); border-radius:8px; padding:24px; }
+  #stage svg { display:block; margin:0 auto; }
+  section.card { background:#fff; border:1px solid var(--line); border-radius:8px; margin-top:16px; overflow:hidden; }
+  section.card > h2 { margin:0; padding:12px 16px; font-size:14px; font-weight:600; border-bottom:1px solid var(--line); background:#fafbfc; }
+  #lint { padding:12px 16px; }
+  #lint .ok { color:#009E73; font-weight:600; }
+  #lint ul { margin:0; padding-left:20px; }
+  #lint li { margin:4px 0; font-size:13px; }
+  #lint li.error { color:#c62828; }
+  #lint li.warning { color:#b26a00; }
+  #lint li.info { color:var(--muted); }
+  #dsl-text { width:100%; min-height:240px; border:none; resize:vertical; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; padding:12px 16px; color:#333; background:#fff; }
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1f2329; color:#fff; padding:8px 16px; border-radius:6px; font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+  <header>
+    <h1 id="title">SciFig 预览</h1>
+    <p>这是自动生成的科研示意图草稿。满意可直接导出 PNG/TIFF 投稿；需精修点「去精修」在 draw.io 里改。</p>
+  </header>
+
+  <div class="toolbar">
+    <button class="primary" id="btn-drawio">去精修 (draw.io)</button>
+    <button id="btn-download-drawio">下载 .drawio</button>
+    <button id="btn-copy-svg">复制 SVG</button>
+    <button id="btn-download-svg">下载 SVG</button>
+    <button id="btn-copy-dsl">复制 DSL</button>
+    <span class="spacer"></span>
+    <label class="dpi-label">DPI
+      <select id="dpi-select">
+        <option value="300">300</option>
+        <option value="600" selected>600</option>
+        <option value="1200">1200</option>
+      </select>
+    </label>
+    <button id="btn-png">导出 PNG</button>
+    <button id="btn-tiff">导出 TIFF</button>
+  </div>
+
+  <main>
+    <div id="canvas-wrap"><div id="stage"></div></div>
+
+    <section class="card">
+      <h2>校验报告</h2>
+      <div id="lint"></div>
+    </section>
+
+    <section class="card">
+      <h2>DSL（唯一真源，可复制贴回给 AI 继续迭代）</h2>
+      <textarea id="dsl-text" spellcheck="false" readonly></textarea>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+
+<script>
+/* SciFig v1 —— 科研示意图渲染器（唯一真源 DSL → SVG）
+ *
+ * 架构铁律（见 DESIGN.md §2）：
+ *   1. DSL(JSON) 是唯一真源，SVG / PNG / editor.html 均为渲染产物
+ *   2. 本文件是唯一渲染器：浏览器编辑器与 Node CLI 调用同一份代码
+ *   3. lint 也是本模块导出的纯函数，双端规则永远一致
+ *
+ * 零依赖。文字度量走预生成字宽查表（fontmetrics.json），
+ * 不依赖运行环境字体 —— 这是双端布局一致性的根基。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.SciFig = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // ---------------- 常量 ----------------
+  var SCHEMA = 'scifig/v1';
+  var VERSION = '1.0.0';
+  var PX_PER_PT = 4 / 3;          // 96dpi 下 1pt = 4/3 px
+  var LINE_H = 1.2;               // 行高（em 倍数）
+  var FONT_MIN = 5, FONT_MAX = 8; // lint 硬边界（pt）
+  var STROKE_MIN = 0.5;           // lint 硬边界（pt）
+
+  // Okabe-Ito 色盲安全调色板（黑白可辨），按语义角色映射
+  var OKABE = {
+    primary: '#0072B2', secondary: '#E69F00', accent: '#009E73',
+    input: '#56B4E9', output: '#D55E00', muted: '#7F7F7F', flow: '#000000'
+  };
+  var ROLES = Object.keys(OKABE);
+  var SHAPES = ['rect', 'round', 'circle', 'ellipse', 'diamond', 'hex', 'cylinder', 'parallelogram'];
+
+  // 视觉风格（全局统一，与期刊尺寸预设解耦）
+  var VIZ = {
+    rectRadius: 2,             // 直角矩形默认圆角 px
+    roundRatio: 0.22,          // 圆角矩形圆角比例
+    groupFill: '#F4F6FA',      // 分组框填充
+    groupStroke: '#A0A8B8',    // 分组框边框
+    groupLabel: '#4A5568',     // 分组标题色
+    feedbackStroke: '#8A94A6', // feedback/回折边
+    arrowSize: 8,              // 箭头尺寸 px
+    emphasize: ['input', 'output'] // 强调角色（深填充 + 粗描边 + 加粗文字）
+  };
+  var EDGE_KINDS = ['arrow', 'line', 'dashed', 'double'];
+  var ROUTINGS = ['ortho', 'poly', 'straight'];
+  var ALIGNS = ['left', 'center', 'right'];
+
+  var METRICS = null, PRESETS = null;
+
+  function init(cfg) {
+    if (cfg && cfg.metrics) METRICS = cfg.metrics;
+    if (cfg && cfg.presets) PRESETS = cfg.presets;
+    return { metrics: !!METRICS, presets: !!PRESETS };
+  }
+
+  function unitPx(unit) {
+    if (unit === 'mm') return 96 / 25.4;
+    if (unit === 'in') return 96;
+    return 1; // px
+  }
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function fmt(n) { return Math.round(n * 100) / 100; }
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // 颜色向白色混合（浅色填充）：f 为混白比例
+  function lighten(hex, f) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.round(r + (255 - r) * f); g = Math.round(g + (255 - g) * f); b = Math.round(b + (255 - b) * f);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+  }
+
+  // ---------------- 校验（白名单，未知属性拒绝） ----------------
+  var TOP_KEYS = ['schema', 'meta', 'style', 'nodes', 'edges', 'groups', 'annotations'];
+  var NODE_KEYS = ['id', 'shape', 'label', 'role', 'position', 'size'];
+  var EDGE_KEYS = ['id', 'from', 'to', 'kind', 'label', 'labelPos', 'routing', 'feedback'];
+  var GROUP_KEYS = ['id', 'members', 'label', 'style', 'padding'];
+  var ANNO_KEYS = ['id', 'text', 'position', 'align', 'size'];
+
+  function err(issues, element, msg) { issues.push({ rule: 'SCHEMA', severity: 'error', element: element, message: msg }); }
+
+  function validate(dsl) {
+    var issues = [];
+    if (!dsl || typeof dsl !== 'object') { err(issues, '(root)', 'DSL 必须是对象'); return { pass: false, issues: issues }; }
+    if (dsl.schema !== SCHEMA) err(issues, '(root)', 'schema 必须是 ' + SCHEMA);
+    for (var k in dsl) if (TOP_KEYS.indexOf(k) < 0) err(issues, '(root)', '未知顶层字段: ' + k);
+
+    var meta = dsl.meta || {};
+    if (meta.direction && ['TB', 'LR'].indexOf(meta.direction) < 0) err(issues, 'meta', 'direction 只允许 TB | LR');
+    if (PRESETS && meta.preset && !PRESETS[meta.preset]) err(issues, 'meta', '未知预设: ' + meta.preset + '（可用: ' + Object.keys(PRESETS).join(', ') + '）');
+
+    var st = dsl.style || {};
+    if (st.palette && st.palette !== 'okabe-ito') err(issues, 'style', 'palette 只支持 okabe-ito');
+    if (st.strokeWidth != null && (typeof st.strokeWidth !== 'number' || st.strokeWidth <= 0)) err(issues, 'style', 'strokeWidth 必须是正数');
+    if (st.fontSize) {
+      if (st.fontSize.body != null && typeof st.fontSize.body !== 'number') err(issues, 'style', 'fontSize.body 必须是数字');
+      if (st.fontSize.small != null && typeof st.fontSize.small !== 'number') err(issues, 'style', 'fontSize.small 必须是数字');
+    }
+
+    if (!Array.isArray(dsl.nodes) || dsl.nodes.length === 0) err(issues, 'nodes', 'nodes 必须是非空数组');
+
+    var ids = {};
+    (dsl.nodes || []).forEach(function (n, i) {
+      var el = 'nodes[' + i + ']';
+      if (!n || typeof n !== 'object') { err(issues, el, '必须是对象'); return; }
+      for (var k in n) if (NODE_KEYS.indexOf(k) < 0) err(issues, el, '未知字段: ' + k);
+      if (!n.id || typeof n.id !== 'string') err(issues, el, '缺少 id');
+      else if (ids[n.id]) err(issues, el, 'id 重复: ' + n.id);
+      else ids[n.id] = true;
+      if (n.shape && SHAPES.indexOf(n.shape) < 0) err(issues, el, 'shape 只允许: ' + SHAPES.join(', '));
+      if (n.role && ROLES.indexOf(n.role) < 0) err(issues, el, 'role 只允许: ' + ROLES.join(', '));
+      if (n.position && (typeof n.position.x !== 'number' || typeof n.position.y !== 'number')) err(issues, el, 'position.x/y 必须是数字');
+      if (n.size) {
+        var bad = function (v) { return v !== 'auto' && typeof v !== 'number'; };
+        if (bad(n.size.w) || bad(n.size.h) || (typeof n.size.w === 'number' && n.size.w <= 0) || (typeof n.size.h === 'number' && n.size.h <= 0))
+          err(issues, el, 'size.w/h 只允许正数或 "auto"');
+      }
+    });
+
+    (dsl.edges || []).forEach(function (e, i) {
+      var el = 'edges[' + i + ']';
+      if (!e || typeof e !== 'object') { err(issues, el, '必须是对象'); return; }
+      for (var k in e) if (EDGE_KEYS.indexOf(k) < 0) err(issues, el, '未知字段: ' + k);
+      if (!e.id || typeof e.id !== 'string') err(issues, el, '缺少 id');
+      if (!ids[e.from]) err(issues, el, 'from 引用不存在的节点: ' + e.from);
+      if (!ids[e.to]) err(issues, el, 'to 引用不存在的节点: ' + e.to);
+      if (e.from === e.to) err(issues, el, '不允许自环');
+      if (e.kind && EDGE_KINDS.indexOf(e.kind) < 0) err(issues, el, 'kind 只允许: ' + EDGE_KINDS.join(', '));
+      if (e.routing && ROUTINGS.indexOf(e.routing) < 0) err(issues, el, 'routing 只允许: ' + ROUTINGS.join(', '));
+      if (e.labelPos != null && (typeof e.labelPos !== 'number' || e.labelPos < 0 || e.labelPos > 1)) err(issues, el, 'labelPos 必须在 [0,1]');
+    });
+
+    (dsl.groups || []).forEach(function (g, i) {
+      var el = 'groups[' + i + ']';
+      if (!g || typeof g !== 'object') { err(issues, el, '必须是对象'); return; }
+      for (var k in g) if (GROUP_KEYS.indexOf(k) < 0) err(issues, el, '未知字段: ' + k);
+      if (!g.id || typeof g.id !== 'string') err(issues, el, '缺少 id');
+      if (!Array.isArray(g.members) || g.members.length === 0) err(issues, el, 'members 必须是非空数组');
+      (g.members || []).forEach(function (m) { if (!ids[m]) err(issues, el, 'member 引用不存在的节点: ' + m); });
+    });
+
+    (dsl.annotations || []).forEach(function (a, i) {
+      var el = 'annotations[' + i + ']';
+      if (!a || typeof a !== 'object') { err(issues, el, '必须是对象'); return; }
+      for (var k in a) if (ANNO_KEYS.indexOf(k) < 0) err(issues, el, '未知字段: ' + k);
+      if (a.text == null) err(issues, el, '缺少 text');
+      if (a.align && ALIGNS.indexOf(a.align) < 0) err(issues, el, 'align 只允许: ' + ALIGNS.join(', '));
+      if (a.size && ['small', 'body'].indexOf(a.size) < 0) err(issues, el, 'size 只允许 small | body');
+    });
+
+    return { pass: issues.length === 0, issues: issues };
+  }
+
+  // ---------------- 文字度量（查表，双端一致） ----------------
+  var CJK_RANGES = [
+    [0x2E80, 0x2EFF], [0x3000, 0x303F], [0x3040, 0x30FF], [0x31F0, 0x31FF],
+    [0x3400, 0x4DBF], [0x4E00, 0x9FFF], [0xF900, 0xFAFF], [0xFF00, 0xFFEF],
+    [0x20000, 0x2A6DF]
+  ];
+
+  function isCJK(cp) {
+    for (var i = 0; i < CJK_RANGES.length; i++)
+      if (cp >= CJK_RANGES[i][0] && cp <= CJK_RANGES[i][1]) return true;
+    return false;
+  }
+
+  function charEm(cp) {
+    if (isCJK(cp)) return METRICS ? METRICS.cjkAdvance : 1.0;
+    if (!METRICS) return 0.55; // 未初始化时的粗略兜底（正常流程不会走到）
+    var segs = METRICS.segments, lo = 0, hi = segs.length - 1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1, s = segs[mid];
+      if (cp < s[0]) hi = mid - 1;
+      else if (cp > s[1]) lo = mid + 1;
+      else return s[2];
+    }
+    return METRICS.defaultAdvance;
+  }
+
+  // 度量一段文字：宽/高/行数（fontSize 单位 pt）
+  function measure(text, fontPt) {
+    var fs = fontPt * PX_PER_PT;
+    var lines = String(text == null ? '' : text).split('\n');
+    var w = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var lw = 0, line = lines[i];
+      for (var j = 0; j < line.length; j++) lw += charEm(line.codePointAt(j));
+      if (lw > w) w = lw;
+    }
+    return { width: w * fs, height: lines.length * fs * LINE_H, lines: lines.length };
+  }
+
+  // ---------------- 布局 ----------------
+  // 返回 { nodes, edges, groups, annotations, canvas, font, notes }
+  // nodes/edges/groups 均含最终几何；canvas 为 px(96dpi)
+  function layout(dsl, opt) {
+    opt = opt || {};
+    var presetName = dsl.meta && dsl.meta.preset && PRESETS && PRESETS[dsl.meta.preset] ? dsl.meta.preset : 'screen';
+    var preset = PRESETS ? PRESETS[presetName] : null;
+    if (!preset) throw new Error('预设未加载，请先 init({presets})');
+    var dir = (dsl.meta && dsl.meta.direction) === 'TB' ? 'TB' : 'LR';
+    var compact = !!opt.compact;
+    var scale = opt.fontScale || 1;
+    var notes = [];
+
+    var bodyPt = scale * ((dsl.style && dsl.style.fontSize && dsl.style.fontSize.body != null) ? dsl.style.fontSize.body : preset.baseFont);
+    var smallPt = (dsl.style && dsl.style.fontSize && dsl.style.fontSize.small != null) ? dsl.style.fontSize.small : preset.smallFont;
+    var font = { body: bodyPt, small: smallPt };
+    var padX = preset.nodePaddingX, padY = preset.nodePaddingY;
+    var layerGap = compact ? preset.minLayerGap : preset.layerGap;
+    var nodeGap = compact ? preset.minNodeGap : preset.nodeGap;
+    var strokePt = (dsl.style && dsl.style.strokeWidth != null) ? dsl.style.strokeWidth : preset.stroke;
+
+    // ---- 节点自然尺寸（auto = 文字度量 + padding）----
+    var nodes = dsl.nodes.map(function (n) {
+      var m = measure(n.label != null ? n.label : n.id, font.body);
+      var w, h, sizePinned = false;
+      if (n.size && typeof n.size.w === 'number') { w = n.size.w; sizePinned = true; } else w = m.width + 2 * padX;
+      if (n.size && typeof n.size.h === 'number') { h = n.size.h; sizePinned = true; } else h = m.height + 2 * padY;
+      // 异形节点需要更多内部余量
+      if (n.shape === 'diamond') { w = Math.max(w, m.width * 1.6); h = Math.max(h, m.height * 1.5); }
+      else if (n.shape === 'hex') { w = Math.max(w, m.width + h * 0.6); }
+      else if (n.shape === 'cylinder') { h = Math.max(h, m.height + 2 * padY + h * 0.18); }
+      if (n.shape === 'circle') { var d = Math.max(w, h); w = d; h = d; }
+      return {
+        id: n.id, shape: n.shape || 'rect', label: n.label != null ? n.label : n.id,
+        role: n.role || 'primary', lw: m.width, lh: m.height,
+        w: w, h: h, sizePinned: sizePinned,
+        position: n.position || null, x: 0, y: 0, layer: 0
+      };
+    });
+    var byId = {};
+    nodes.forEach(function (n) { byId[n.id] = n; });
+
+    // ---- 边分类：feedback 不参与分层 ----
+    var edges = (dsl.edges || []).map(function (e) {
+      return {
+        id: e.id, from: e.from, to: e.to, kind: e.kind || 'arrow',
+        label: e.label || '', labelPos: (e.labelPos != null ? e.labelPos : 0.5),
+        routing: e.routing || 'ortho', feedback: !!e.feedback, pts: []
+      };
+    });
+    var normal = edges.filter(function (e) { return !e.feedback; });
+    var feedback = edges.filter(function (e) { return e.feedback; });
+
+    // ---- 分层（Kahn + longest-path；残留环自动降级为 feedback）----
+    var layer = {};
+    function runKahn(edgeList) {
+      var indeg = {}; nodes.forEach(function (n) { indeg[n.id] = 0; });
+      edgeList.forEach(function (e) { indeg[e.to]++; });
+      var queue = nodes.filter(function (n) { return indeg[n.id] === 0; }).map(function (n) { return n.id; });
+      var processed = {};
+      var i = 0;
+      while (i < queue.length) {
+        var u = queue[i++]; processed[u] = true;
+        edgeList.forEach(function (e) {
+          if (e.from !== u) return;
+          layer[e.to] = Math.max(layer[e.to] || 0, (layer[u] || 0) + 1);
+          if (--indeg[e.to] === 0) queue.push(e.to);
+        });
+      }
+      return processed;
+    }
+    var guard = 0;
+    while (guard++ <= edges.length) {
+      for (var k in layer) delete layer[k];
+      nodes.forEach(function (n) { layer[n.id] = 0; });
+      var processed = runKahn(normal);
+      if (Object.keys(processed).length === nodes.length) break;
+      // 存在环：环上节点全部未被 Kahn 处理，摘掉环内一条边重试
+      var unproc = nodes.filter(function (n) { return !processed[n.id]; }).map(function (n) { return n.id; });
+      var back = normal.find(function (e) { return unproc.indexOf(e.from) >= 0 && unproc.indexOf(e.to) >= 0; });
+      if (!back) break; // 理论不可达，保底退出
+      back.feedback = true; feedback.push(back);
+      normal = normal.filter(function (e) { return e !== back; });
+      notes.push('检测到环，边 ' + back.id + ' 已自动按 feedback 处理');
+    }
+    nodes.forEach(function (n) { n.layer = layer[n.id] || 0; });
+
+    // ---- 层内排序：barycenter 启发式（4 轮，确定性稳定排序）----
+    var nLayers = 0;
+    nodes.forEach(function (n) { if (n.layer >= nLayers) nLayers = n.layer + 1; });
+    var layers = [];
+    for (var i = 0; i < nLayers; i++) layers.push([]);
+    nodes.forEach(function (n) { layers[n.layer].push(n); });
+    var pos = {}; // barycenter 参考位（layer 内下标）
+    layers.forEach(function (L) { L.forEach(function (n, i) { pos[n.id] = i; }); });
+
+    function bary(n, li) {
+      var sum = 0, cnt = 0;
+      normal.forEach(function (e) {
+        if (e.from === n.id && byId[e.to] && byId[e.to].layer === li) { sum += pos[e.to]; cnt++; }
+        if (e.to === n.id && byId[e.from] && byId[e.from].layer === li) { sum += pos[e.from]; cnt++; }
+      });
+      return cnt ? sum / cnt : pos[n.id];
+    }
+    for (var it = 0; it < 4; it++) {
+      var down = (it % 2 === 0);
+      var seq = down ? range(1, nLayers - 1) : rangeRev(nLayers - 2, 0);
+      seq.forEach(function (li) {
+        var barys = layers[li].map(function (n) { return { n: n, b: bary(n, down ? li - 1 : li + 1), i: pos[n.id] }; });
+        barys.sort(function (a, b) { return a.b - b.b || a.i - b.i; });
+        layers[li] = barys.map(function (o) { return o.n; });
+        layers[li].forEach(function (n, i2) { pos[n.id] = i2; });
+      });
+    }
+
+    // ---- 坐标：position = 绝对画布坐标；auto 节点 0 起分层，再整体平移 offX/offY ----
+    var dims = layers.map(function (L) { var a = L.filter(function (n) { return !n.position; }); if (!a.length) return 0; return Math.max.apply(null, a.map(function (n) { return dir === 'LR' ? n.w : n.h; })); });
+    var cross = 0;
+    layers.forEach(function (L) {
+      L.filter(function (n) { return n.position; }).forEach(function (n) { n.x = n.position.x; n.y = n.position.y; });
+      var cur = 0;
+      L.filter(function (n) { return !n.position; }).forEach(function (n) {
+        var size = dir === 'LR' ? n.h : n.w;
+        if (dir === 'LR') { n.y = cur; n.x = 0; } else { n.x = cur; n.y = 0; }
+        cur += size + nodeGap;
+      });
+      var lo = Infinity, hi = -Infinity;
+      L.filter(function (n) { return !n.position; }).forEach(function (n) {
+        var a = dir === 'LR' ? n.y : n.x, b = dir === 'LR' ? n.y + n.h : n.x + n.w;
+        if (a < lo) lo = a; if (b > hi) hi = b;
+      });
+      L.span = (lo === Infinity) ? 0 : hi - lo;
+      L.lo = (lo === Infinity) ? 0 : lo;
+    });
+    layers.forEach(function (L) { cross = Math.max(cross, L.span); });
+
+    // 层原点（沿流向）；fixed 节点保持 position 不动
+    var flowPos = 0;
+    layers.forEach(function (L, li) {
+      var off = (cross - L.span) / 2 - L.lo;
+      L.forEach(function (n) {
+        if (n.position) return;
+        if (dir === 'LR') { n.y += off; n.x = flowPos + (dims[li] - n.w) / 2; }
+        else { n.x += off; n.y = flowPos + (dims[li] - n.h) / 2; }
+      });
+      flowPos += dims[li] + layerGap;
+    });
+    flowPos -= layerGap;
+
+    // ---- offX/offY 仅由 auto 节点决定；平移 auto 节点（fixed 不动）----
+    var m = preset.margin;
+    var target = preset.width.value * unitPx(preset.width.unit);
+    var aminX = Infinity, aminY = Infinity, amaxX = -Infinity;
+    nodes.forEach(function (n) {
+      if (n.position) return;
+      aminX = Math.min(aminX, n.x); aminY = Math.min(aminY, n.y);
+      amaxX = Math.max(amaxX, n.x + n.w);
+    });
+    var offX, offY;
+    if (aminX === Infinity) { offX = m; offY = m; }
+    else {
+      var autoW = amaxX - aminX;
+      offY = m - aminY;
+      offX = (autoW + 2 * m <= target) ? (target - autoW) / 2 - aminX : m - aminX;
+    }
+    nodes.forEach(function (n) { if (n.position) return; n.x += offX; n.y += offY; });
+
+    // ---- 分组框（成员包围盒 + padding）----
+    var groups = (dsl.groups || []).map(function (g) {
+      var lox = Infinity, loy = Infinity, hix = -Infinity, hiy = -Infinity;
+      g.members.forEach(function (mid) {
+        var n = byId[mid]; if (!n) return;
+        if (n.x < lox) lox = n.x; if (n.y < loy) loy = n.y;
+        if (n.x + n.w > hix) hix = n.x + n.w; if (n.y + n.h > hiy) hiy = n.y + n.h;
+      });
+      if (lox === Infinity) { lox = loy = 0; hix = hiy = 10; }
+      var p = g.padding != null ? g.padding : preset.groupPadding;
+      var extraTop = g.label ? p + font.small * PX_PER_PT * 1.4 : p;
+      return { id: g.id, members: g.members, label: g.label || '', x: lox - p, y: loy - extraTop, w: (hix - lox) + 2 * p, h: (hiy - loy) + p + extraTop, dashed: g.style !== 'solid' };
+    });
+
+    // ---- 边几何 ----
+    var maxY = 0, maxX = 0;
+    nodes.forEach(function (n) { maxY = Math.max(maxY, n.y + n.h); maxX = Math.max(maxX, n.x + n.w); });
+    groups.forEach(function (g) { maxY = Math.max(maxY, g.y + g.h); maxX = Math.max(maxX, g.x + g.w); });
+
+    edges.forEach(function (e) {
+      var s = byId[e.from], t = byId[e.to];
+      if (!s || !t) return;
+      if (e.feedback) {
+        e.pts = feedbackPath(s, t, dir, maxY, maxX, feedback.indexOf(e));
+      } else if (dir === 'LR') {
+        var sx = s.x + s.w, sy = s.y + s.h / 2, tx = t.x, ty = t.y + t.h / 2;
+        e.pts = (e.routing === 'straight') ? borderLine(s, t) : [[sx, sy], [(sx + tx) / 2, sy], [(sx + tx) / 2, ty], [tx, ty]];
+        if (e.routing === 'poly') e.pts = [[sx, sy], [(sx + tx) / 2, (sy + ty) / 2], [tx, ty]];
+      } else {
+        var sx2 = s.x + s.w / 2, sy2 = s.y + s.h, tx2 = t.x + t.w / 2, ty2 = t.y;
+        e.pts = (e.routing === 'straight') ? borderLine(s, t) : [[sx2, sy2], [sx2, (sy2 + ty2) / 2], [tx2, (sy2 + ty2) / 2], [tx2, ty2]];
+        if (e.routing === 'poly') e.pts = [[sx2, sy2], [(sx2 + tx2) / 2, (sy2 + ty2) / 2], [tx2, ty2]];
+      }
+    });
+    // feedback 的绕行距离纳入画布
+    feedback.forEach(function (e, i) {
+      if (!e.pts.length) return;
+      e.pts.forEach(function (p) { maxY = Math.max(maxY, p[1]); maxX = Math.max(maxX, p[0]); });
+    });
+
+    // ---- 注释 ----
+    var annotations = (dsl.annotations || []).map(function (a) {
+      var m = measure(a.text, a.size === 'body' ? font.body : font.small);
+      return { id: a.id, text: a.text, x: (a.position && a.position.x) || 0, y: (a.position && a.position.y) || 0, w: m.width, h: m.height, align: a.align || 'left', size: a.size || 'small' };
+    });
+    annotations.forEach(function (a) {
+      maxX = Math.max(maxX, a.x + a.w); maxY = Math.max(maxY, a.y + a.h);
+      // 注释可能给出负坐标
+    });
+    // ---- 画布：全部内容包围盒 + margin；负坐标整体纠偏；不小于目标宽度 ----
+    var cminX = Infinity, cminY = Infinity, cmaxX = -Infinity, cmaxY = -Infinity;
+    function grow(x, y, w, h) { cminX = Math.min(cminX, x); cminY = Math.min(cminY, y); cmaxX = Math.max(cmaxX, x + w); cmaxY = Math.max(cmaxY, y + h); }
+    nodes.forEach(function (n) { grow(n.x, n.y, n.w, n.h); });
+    groups.forEach(function (g) { grow(g.x, g.y, g.w, g.h); });
+    annotations.forEach(function (a) { grow(a.x, a.y, a.w, a.h); });
+    edges.forEach(function (e) { e.pts.forEach(function (p) { cminX = Math.min(cminX, p[0]); cminY = Math.min(cminY, p[1]); cmaxX = Math.max(cmaxX, p[0]); cmaxY = Math.max(cmaxY, p[1]); }); });
+    if (cminX < 0 || cminY < 0) {
+      var dx = cminX < 0 ? -cminX : 0, dy = cminY < 0 ? -cminY : 0;
+      nodes.forEach(function (n) { n.x += dx; n.y += dy; });
+      groups.forEach(function (g) { g.x += dx; g.y += dy; });
+      annotations.forEach(function (a) { a.x += dx; a.y += dy; });
+      edges.forEach(function (e) { e.pts = e.pts.map(function (p) { return [p[0] + dx, p[1] + dy]; }); });
+      cmaxX += dx; cmaxY += dy;
+    }
+    var natH = cmaxY + m;
+    var canvasW = Math.max(cmaxX + m, target);
+
+    return {
+      nodes: nodes, edges: edges, groups: groups, annotations: annotations,
+      canvas: { w: canvasW, h: natH },
+      font: font, strokePt: strokePt, preset: presetName, presetDef: preset,
+      direction: dir, target: target, notes: notes, offX: offX, offY: offY
+    };
+  }
+
+  function range(a, b) { var r = []; for (var i = a; i <= b; i++) r.push(i); return r; }
+  function rangeRev(a, b) { var r = []; for (var i = a; i >= b; i--) r.push(i); return r; }
+
+  // straight 路由：中心连线与边框的交点
+
+  // feedback 绕行路径：LR 从底部绕，TB 从右侧绕；index 用于多条 feedback 堆叠
+  function feedbackPath(s, t, dir, maxY, maxX, index) {
+    var gap = 26 + 16 * index;
+    if (dir === 'LR') {
+      var y = maxY + gap;
+      var sx = s.x + s.w / 2, tx = t.x + t.w / 2;
+      return [[sx, s.y + s.h], [sx, y], [tx, y], [tx, t.y + t.h]];
+    }
+    var x = maxX + gap;
+    var sy = s.y + s.h / 2, ty = t.y + t.h / 2;
+    return [[s.x + s.w, sy], [x, sy], [x, ty], [t.x, ty]];
+  }
+
+  // straight 路由：中心连线与边框的交点
+  function borderLine(s, t) {
+    var scx = s.x + s.w / 2, scy = s.y + s.h / 2, tcx = t.x + t.w / 2, tcy = t.y + t.h / 2;
+    return [rectExit(s, scx, scy, tcx, tcy), rectExit(t, tcx, tcy, scx, scy)];
+  }
+  function rectExit(r, cx, cy, ox, oy) {
+    var dx = ox - cx, dy = oy - cy;
+    if (dx === 0 && dy === 0) return [cx, cy];
+    var tx = dx !== 0 ? (dx > 0 ? (r.x + r.w - cx) / dx : (r.x - cx) / dx) : Infinity;
+    var ty = dy !== 0 ? (dy > 0 ? (r.y + r.h - cy) / dy : (r.y - cy) / dy) : Infinity;
+    var tt = Math.min(tx, ty);
+    return [cx + dx * tt, cy + dy * tt];
+  }
+
+  // 折线长度与按比例取点（用于边标签定位）
+  function pathLen(pts) {
+    var L = 0;
+    for (var i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    return L;
+  }
+  function pointAt(pts, t) {
+    var total = pathLen(pts); if (total === 0) return pts[0].slice();
+    var d = total * t;
+    for (var i = 1; i < pts.length; i++) {
+      var seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      if (d <= seg || i === pts.length - 1) {
+        var f = seg === 0 ? 0 : Math.min(1, d / seg);
+        return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f];
+      }
+      d -= seg;
+    }
+    return pts[pts.length - 1].slice();
+  }
+
+  // ---------------- SVG 生成 ----------------
+  function shapePath(n) {
+    var x = fmt(n.x), y = fmt(n.y), w = fmt(n.w), h = fmt(n.h);
+    switch (n.shape) {
+      case 'round':
+        return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + fmt(Math.min(n.w, n.h) * VIZ.roundRatio) + '"/>';
+      case 'circle':
+      case 'ellipse':
+        return '<ellipse cx="' + fmt(n.x + n.w / 2) + '" cy="' + fmt(n.y + n.h / 2) + '" rx="' + fmt(n.w / 2) + '" ry="' + fmt(n.h / 2) + '"/>';
+      case 'diamond':
+        return '<path d="M ' + fmt(n.x + n.w / 2) + ',' + y + ' L ' + fmt(n.x + n.w) + ',' + fmt(n.y + n.h / 2) + ' L ' + fmt(n.x + n.w / 2) + ',' + fmt(n.y + n.h) + ' L ' + x + ',' + fmt(n.y + n.h / 2) + ' Z"/>';
+      case 'hex': {
+        var c = fmt(n.h * 0.25), cy = fmt(n.y + n.h / 2);
+        return '<path d="M ' + fmt(n.x + c) + ',' + y + ' L ' + fmt(n.x + n.w - c) + ',' + y + ' L ' + fmt(n.x + n.w) + ',' + cy + ' L ' + fmt(n.x + n.w - c) + ',' + fmt(n.y + n.h) + ' L ' + fmt(n.x + c) + ',' + fmt(n.y + n.h) + ' L ' + x + ',' + cy + ' Z"/>';
+      }
+      case 'cylinder': {
+        var ry = fmt(n.h * 0.09), cy2 = fmt(n.y + ry * 2);
+        return '<path d="M ' + x + ',' + cy2 + ' A ' + fmt(n.w / 2) + ',' + ry + ' 0 0 1 ' + fmt(n.x + n.w) + ',' + cy2 +
+          ' L ' + fmt(n.x + n.w) + ',' + fmt(n.y + n.h - ry * 2) + ' A ' + fmt(n.w / 2) + ',' + ry + ' 0 0 1 ' + x + ',' + fmt(n.y + n.h - ry * 2) +
+          ' A ' + fmt(n.w / 2) + ',' + ry + ' 0 0 1 ' + fmt(n.x + n.w) + ',' + fmt(n.y + n.h - ry * 2) + ' M ' + x + ',' + cy2 +
+          ' A ' + fmt(n.w / 2) + ',' + ry + ' 0 0 0 ' + fmt(n.x + n.w) + ',' + cy2 + '"/>';
+      }
+      case 'parallelogram': {
+        var sk = fmt(n.h * 0.2);
+        return '<path d="M ' + fmt(n.x + sk) + ',' + y + ' L ' + fmt(n.x + n.w) + ',' + y + ' L ' + fmt(n.x + n.w - sk) + ',' + fmt(n.y + n.h) + ' L ' + x + ',' + fmt(n.y + n.h) + ' Z"/>';
+      }
+      default:
+        return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + VIZ.rectRadius + '"/>';
+    }
+  }
+
+  function textLines(label, cx, cy, fsPx, cls) {
+    var lines = String(label).split('\n');
+    var out = '';
+    for (var i = 0; i < lines.length; i++) {
+      var yc = cy + (i - (lines.length - 1) / 2) * fsPx * LINE_H + fsPx * 0.35;
+      out += '<tspan x="' + fmt(cx) + '" y="' + fmt(yc) + '">' + esc(lines[i]) + '</tspan>';
+    }
+    return '<text text-anchor="middle" class="' + cls + '">' + out + '</text>';
+  }
+
+  function renderSVG(dsl, L) {
+    var p = L.presetDef;
+    var unit = p.width.unit, uv = p.width.value;
+    var wAttr = unit === 'px' ? Math.round(uv) + 'px' : uv + unit;
+    var upx = unitPx(unit);
+    var hVal = unit === 'px' ? Math.round(L.canvas.h) : Math.round(L.canvas.h / upx * 1000) / 1000;
+    var hAttr = hVal + unit;
+    var fontStack = (dsl.style && dsl.style.fontStack) || 'Arial, Helvetica, Liberation Sans, sans-serif';
+    var sw = fmt(L.strokePt * PX_PER_PT);
+
+    var s = '';
+    s += '<svg xmlns="http://www.w3.org/2000/svg" width="' + wAttr + '" height="' + hAttr + '" viewBox="0 0 ' + fmt(L.canvas.w) + ' ' + fmt(L.canvas.h) + '" font-family="' + esc(fontStack) + '">';
+    s += '<defs>'
+      + '<marker id="sf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="' + VIZ.arrowSize + '" markerHeight="' + VIZ.arrowSize + '" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="' + OKABE.flow + '"/></marker>'
+      + '<marker id="sf-arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="' + VIZ.arrowSize + '" markerHeight="' + VIZ.arrowSize + '" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="' + VIZ.feedbackStroke + '"/></marker>'
+      + '</defs>';
+    s += '<rect x="0" y="0" width="' + fmt(L.canvas.w) + '" height="' + fmt(L.canvas.h) + '" fill="#FFFFFF"/>';
+
+    // 分组框（最底层）
+    L.groups.forEach(function (g) {
+      s += '<g id="sf-' + g.id + '" data-id="' + esc(g.id) + '" data-type="group">';
+      s += '<rect x="' + fmt(g.x) + '" y="' + fmt(g.y) + '" width="' + fmt(g.w) + '" height="' + fmt(g.h) + '" rx="6" fill="' + VIZ.groupFill + '" stroke="' + VIZ.groupStroke + '" stroke-width="' + fmt(0.7 * PX_PER_PT) + '"' + (g.dashed ? ' stroke-dasharray="5,3"' : '') + '/>';
+      if (g.label) s += '<text x="' + fmt(g.x + 8) + '" y="' + fmt(g.y + 7 + L.font.small * PX_PER_PT) + '" font-size="' + fmt(L.font.small * PX_PER_PT) + '" font-weight="600" fill="' + VIZ.groupLabel + '">' + esc(g.label) + '</text>';
+      s += '</g>';
+    });
+
+    // 边（分组之上、节点之下）
+    L.edges.forEach(function (e) {
+      if (!e.pts.length) return;
+      var d = 'M ' + e.pts.map(function (pt) { return fmt(pt[0]) + ',' + fmt(pt[1]); }).join(' L ');
+      var muted = !!e.feedback;
+      var attrs = 'fill="none" stroke="' + (muted ? VIZ.feedbackStroke : OKABE.flow) + '" stroke-width="' + sw + '"';
+      if (e.kind === 'dashed' || muted) attrs += ' stroke-dasharray="6,4"';
+      var arrowId = muted ? 'sf-arrow-muted' : 'sf-arrow';
+      var mk = (e.kind === 'line' && !muted) ? '' : ' marker-end="url(#' + arrowId + ')"';
+      if (e.kind === 'double') mk += ' marker-start="url(#' + arrowId + ')"';
+      s += '<g id="sf-' + e.id + '" data-id="' + esc(e.id) + '" data-type="edge">';
+      s += '<path d="' + d + '" ' + attrs + mk + '/>';
+      s += '<path d="' + d + '" fill="none" stroke="transparent" stroke-width="10" data-role="hit"/>'; // 加宽命中区，方便编辑器点选
+      if (e.label) {
+        var pt = pointAt(e.pts, e.labelPos);
+        var m = measure(e.label, L.font.small);
+        var fsPx = fmt(L.font.small * PX_PER_PT);
+        s += '<rect x="' + fmt(pt[0] - m.width / 2 - 2) + '" y="' + fmt(pt[1] - m.height / 2 - 1) + '" width="' + fmt(m.width + 4) + '" height="' + fmt(m.height + 2) + '" fill="#FFFFFF" opacity="0.9"/>';
+        s += '<text x="' + fmt(pt[0]) + '" y="' + fmt(pt[1] + fsPx * 0.35) + '" font-size="' + fsPx + '" text-anchor="middle" fill="#1A1A1A">' + esc(e.label) + '</text>';
+      }
+      s += '</g>';
+    });
+
+    // 节点
+    L.nodes.forEach(function (n) {
+      var role = OKABE[n.role] || OKABE.primary;
+      var emph = VIZ.emphasize.indexOf(n.role) >= 0;
+      var stroke = role;
+      var fill = n.role === 'flow' ? '#FFFFFF' : lighten(role, emph ? 0.74 : 0.86);
+      var swNode = emph ? fmt(sw * 1.6) : sw;
+      s += '<g id="sf-' + n.id + '" data-id="' + esc(n.id) + '" data-type="node">';
+      s += shapePath(n).replace('/>', ' fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + swNode + '"/>');
+      var cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+      var fw = emph ? ' font-weight="600"' : '';
+      s += textLines(n.label, cx, cy, L.font.body * PX_PER_PT, 'sf-label').replace('<text ', '<text font-size="' + fmt(L.font.body * PX_PER_PT) + '" fill="#111111"' + fw + ' ');
+      s += '</g>';
+    });
+
+    // 注释
+    L.annotations.forEach(function (a) {
+      var fsPt = a.size === 'body' ? L.font.body : L.font.small;
+      var fsPx = fmt(fsPt * PX_PER_PT);
+      var anchor = a.align === 'left' ? 'start' : (a.align === 'right' ? 'end' : 'middle');
+      var ax = a.align === 'left' ? a.x : (a.align === 'right' ? a.x + a.w : a.x + a.w / 2);
+      var baseline = a.y + a.h / 2 + fsPt * PX_PER_PT * 0.35; // 块垂直中心 + 半个 x 字高
+      s += '<g id="sf-' + a.id + '" data-id="' + esc(a.id) + '" data-type="annotation">';
+      s += '<text x="' + fmt(ax) + '" y="' + fmt(baseline) + '" font-size="' + fsPx + '" text-anchor="' + anchor + '" fill="#333333" font-style="italic">' + esc(a.text) + '</text>';
+      s += '</g>';
+    });
+
+    s += '</svg>';
+    return s;
+  }
+
+  // ---------------- lint ----------------
+  function rectsOverlap(a, b) {
+    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  }
+  function segInt(p1, p2, p3, p4) {
+    function d(a, b, c) { return (c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0]); }
+    var d1 = d(p3, p4, p1), d2 = d(p3, p4, p2), d3 = d(p1, p2, p3), d4 = d(p1, p2, p4);
+    return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+  }
+
+  function lint(dsl, L) {
+    var issues = [];
+    function add(rule, sev, el, msg) { issues.push({ rule: rule, severity: sev, element: el, message: msg }); }
+
+    // SIZE：画布不得超过预设目标宽（自然宽度小于目标时居中，不算问题）
+    if (L.canvas.w > L.target + 1)
+      add('SIZE', 'error', '(canvas)', '自然宽度 ' + fmt(L.canvas.w) + 'px 超出预设 ' + L.preset + ' 目标 ' + fmt(L.target) + 'px，请换更宽预设或精简结构');
+
+    // FONT：所有字号落在 [5,8]pt
+    [ ['body', L.font.body], ['small', L.font.small] ].forEach(function (pair) {
+      if (pair[1] < FONT_MIN - 0.01) add('FONT', 'error', 'style.fontSize.' + pair[0], '字号 ' + pair[1] + 'pt 低于下限 ' + FONT_MIN + 'pt');
+      if (pair[1] > FONT_MAX + 0.01) add('FONT', 'error', 'style.fontSize.' + pair[0], '字号 ' + pair[1] + 'pt 高于上限 ' + FONT_MAX + 'pt');
+    });
+
+    // STROKE
+    if (L.strokePt < STROKE_MIN - 0.001) add('STROKE', 'error', 'style.strokeWidth', '线宽 ' + L.strokePt + 'pt 低于下限 ' + STROKE_MIN + 'pt');
+
+    // PALETTE：角色必须在 Okabe-Ito 白名单内
+    L.nodes.forEach(function (n) {
+      if (!(n.role in OKABE)) add('PALETTE', 'error', n.id, '未知 role: ' + n.role);
+    });
+    if (dsl.style && dsl.style.palette && dsl.style.palette !== 'okabe-ito')
+      add('PALETTE', 'error', 'style', 'palette 只支持 okabe-ito');
+
+    // OVERFLOW：文字 bbox ⊆ 容器 bbox（4px 内缩）
+    L.nodes.forEach(function (n) {
+      if (n.lw > n.w - 4 || n.lh > n.h - 4)
+        add('OVERFLOW', 'error', n.id, '标签超出节点边界（标签 ' + fmt(n.lw) + '×' + fmt(n.lh) + '，容器 ' + fmt(n.w) + '×' + fmt(n.h) + '），请改用换行或加大 size');
+    });
+
+    // OVERLAP：节点两两、节点与非成员分组框、分组框两两
+    for (var i = 0; i < L.nodes.length; i++)
+      for (var j = i + 1; j < L.nodes.length; j++)
+        if (rectsOverlap(L.nodes[i], L.nodes[j]))
+          add('OVERLAP', 'warning', L.nodes[i].id + ' × ' + L.nodes[j].id, '节点重叠（手动定位导致），建议微调 position');
+    L.groups.forEach(function (g) {
+      var members = {}; g.members.forEach(function (m) { members[m] = 1; });
+      L.nodes.forEach(function (n) {
+        if (!members[n.id] && rectsOverlap({ x: g.x, y: g.y, w: g.w, h: g.h }, n))
+          add('OVERLAP', 'warning', g.id + ' × ' + n.id, '分组框与非成员节点重叠');
+      });
+    });
+    for (var g1 = 0; g1 < L.groups.length; g1++)
+      for (var g2 = g1 + 1; g2 < L.groups.length; g2++)
+        if (rectsOverlap(L.groups[g1], L.groups[g2]))
+          add('OVERLAP', 'warning', L.groups[g1].id + ' × ' + L.groups[g2].id, '分组框互相重叠');
+
+    // ARROW：箭头风格全局统一（marker 唯一，结构性保证；异常时报告）
+    var kinds = {};
+    L.edges.forEach(function (e) { kinds[e.kind] = 1; });
+    if (L.edges.length && !('arrow' in kinds) && !('double' in kinds))
+      add('ARROW', 'info', '(edges)', '图中没有带箭头的边，请确认是否表达流向');
+
+    // EDGECROSS：边交叉计数（布局质量参考）
+    var cross = 0;
+    for (var a = 0; a < L.edges.length; a++)
+      for (var b = a + 1; b < L.edges.length; b++) {
+        var ea = L.edges[a], eb = L.edges[b];
+        if (ea.from === eb.from && ea.to === eb.to) continue;
+        if (ea.from === eb.to && ea.to === eb.from) continue;
+        outer: for (var s1 = 1; s1 < ea.pts.length; s1++)
+          for (var s2 = 1; s2 < eb.pts.length; s2++)
+            if (segInt(ea.pts[s1 - 1], ea.pts[s1], eb.pts[s2 - 1], eb.pts[s2])) { cross++; break outer; }
+      }
+    if (cross > 0) add('EDGECROSS', 'info', '(edges)', '边交叉 ' + cross + ' 处，可调整 direction 或节点顺序');
+
+    L.notes.forEach(function (n) { add('LAYOUT', 'info', '(layout)', n); });
+
+    var errors = issues.filter(function (x) { return x.severity === 'error'; }).length;
+    return { pass: errors === 0, errors: errors, issues: issues, summary: { nodes: L.nodes.length, edges: L.edges.length, groups: L.groups.length } };
+  }
+
+  // ---------------- 顶层渲染（含自动修正阶梯） ----------------
+  // opts: { autofit: bool = true, preset: 预设名覆盖 }
+  function render(dsl, opts) {
+    opts = opts || {};
+    var v = validate(dsl);
+    if (!v.pass) return { error: v };
+
+    var work = clone(dsl);
+    if (opts.preset) { work.meta = work.meta || {}; work.meta.preset = opts.preset; }
+
+    var fixes = [];
+
+    if (opts.autofit === false) {
+      var L0 = layout(work, {});
+      return { svg: renderSVG(work, L0), layout: L0, report: lint(work, L0), dsl: work, fixes: fixes };
+    }
+
+    // 硬修正：字号/线宽越界直接钳回合法区间
+    work.style = work.style || {};
+    var fs = work.style.fontSize = work.style.fontSize || {};
+    var presetName0 = (work.meta && work.meta.preset) || 'screen';
+    var preset0 = (PRESETS && PRESETS[presetName0]) || PRESETS.screen;
+    if (fs.body == null) fs.body = preset0.baseFont;
+    if (fs.small == null) fs.small = preset0.smallFont;
+    if (fs.body > FONT_MAX) { fixes.push('fontSize.body ' + fs.body + '→' + FONT_MAX); fs.body = FONT_MAX; }
+    if (fs.body < FONT_MIN) { fixes.push('fontSize.body ' + fs.body + '→' + FONT_MIN); fs.body = FONT_MIN; }
+    if (fs.small > fs.body) { fixes.push('fontSize.small ' + fs.small + '→' + fs.body); fs.small = fs.body; }
+    if (fs.small < FONT_MIN) { fixes.push('fontSize.small ' + fs.small + '→' + FONT_MIN); fs.small = FONT_MIN; }
+    if (work.style.strokeWidth != null && work.style.strokeWidth < STROKE_MIN) {
+      fixes.push('strokeWidth ' + work.style.strokeWidth + '→' + STROKE_MIN); work.style.strokeWidth = STROKE_MIN;
+    }
+
+    // 阶梯：自然 → 紧凑 → 字号递减（每次 -0.5pt，下限 5pt）
+    var attempts = [];
+    attempts.push({ compact: false, fontScale: 1 });
+    attempts.push({ compact: true, fontScale: 1 });
+    var body = fs.body;
+    while (body - 0.5 >= FONT_MIN - 0.001) { body = Math.round((body - 0.5) * 10) / 10; attempts.push({ compact: true, fontScale: body / fs.body }); }
+    var chosen = null;
+    for (var i = 0; i < attempts.length && i < 6; i++) { // 阶梯总数封顶 6 轮
+      var L = layout(work, attempts[i]);
+      if (L.canvas.w <= L.target + 1) { chosen = { L: L, att: attempts[i] }; break; }
+      chosen = { L: L, att: attempts[i] }; // 记录最后一轮（都不达标时用）
+    }
+    if (!chosen) chosen = { L: layout(work, {}), att: attempts[0] };
+    // 把最终生效的字号写回 DSL（真源一致），随后用 scale=1 重排
+    var effBody = Math.round(chosen.L.font.body * 10) / 10;
+    if (effBody !== fs.body) { fixes.push('自适应缩字号 ' + fs.body + '→' + effBody + 'pt'); fs.body = effBody; }
+    if (fs.small > fs.body) fs.small = fs.body;
+
+    var Lf = layout(work, { compact: chosen.att.compact, fontScale: 1 });
+    return { svg: renderSVG(work, Lf), layout: Lf, report: lint(work, Lf), dsl: work, fixes: fixes };
+  }
+
+  // ---------------- draw.io (mxGraph) 导出 ----------------
+  // 定位：草稿 → 精修起点。保留结构/形状/颜色/标签/边连通性（source/target），
+  // 用户可在 draw.io 里自由拖动精修，并可再导出 .vsdx 交给 Visio。
+  // 说明：draw.io 渲染引擎与 SVG 不同，无法 100% 复刻排版；此处保证结构正确，
+  //       精美定稿以 SVG 为准。
+  function dlVal(s) { return esc(String(s == null ? '' : s)).replace(/\n/g, '&lt;br&gt;'); }
+
+  function dlShape(shape) {
+    switch (shape) {
+      case 'round': return 'rounded=1;arcSize=' + Math.round(VIZ.roundRatio * 100) + ';';
+      case 'circle': return 'ellipse;';
+      case 'ellipse': return 'ellipse;';
+      case 'diamond': return 'rhombus;';
+      case 'hex': return 'shape=hexagon;perimeter=hexagonPerimeter2;';
+      case 'cylinder': return 'shape=cylinder3;backgroundOutline=1;boundedLbl=1;';
+      case 'parallelogram': return 'shape=parallelogram;perimeter=parallelogramPerimeter;';
+      default: return 'rounded=0;';
+    }
+  }
+
+  function drawio(dsl, L) {
+    var nodeCell = {};
+    var nextId = 2;
+    var cell = [];
+
+    // 预分配节点 cell id（边需要 source/target 引用）
+    L.nodes.forEach(function (n) { nodeCell[n.id] = nextId++; });
+
+    function vertex(id, value, style, x, y, w, h) {
+      return '<mxCell id="' + id + '" value="' + dlVal(value) + '" style="' + style + '" vertex="1" parent="1"><mxGeometry x="' + Math.round(x) + '" y="' + Math.round(y) + '" width="' + Math.round(w) + '" height="' + Math.round(h) + '" as="geometry"/></mxCell>';
+    }
+
+    // 分组框（最底层，z-order 由 root 内顺序决定）
+    L.groups.forEach(function (g) {
+      var style = 'rounded=0;whiteSpace=wrap;html=1;fillColor=' + VIZ.groupFill + ';strokeColor=' + VIZ.groupStroke
+        + ';fontColor=' + VIZ.groupLabel + ';verticalAlign=top;align=left;spacingLeft=6;spacingTop=4;fontStyle=1'
+        + ';fontSize=' + fmt(L.font.small * PX_PER_PT) + ';' + (g.dashed ? 'dashed=1;' : '');
+      cell.push(vertex(nextId++, g.label, style, g.x, g.y, g.w, g.h));
+    });
+
+    // 边
+    L.edges.forEach(function (e) {
+      var muted = !!e.feedback;
+      var color = muted ? VIZ.feedbackStroke : OKABE.flow;
+      var style = (e.routing === 'straight' ? 'edgeStyle=none;' : 'edgeStyle=orthogonalEdgeStyle;')
+        + 'rounded=0;html=1;strokeColor=' + color + ';strokeWidth=' + fmt(L.strokePt * PX_PER_PT)
+        + ';fontSize=' + fmt(L.font.small * PX_PER_PT) + ';';
+      if (e.kind === 'line') style += 'endArrow=none;';
+      else style += 'endArrow=block;';
+      if (e.kind === 'double') style += 'startArrow=block;';
+      if (e.kind === 'dashed' || muted) style += 'dashed=1;';
+      cell.push('<mxCell id="' + nextId++ + '" value="' + dlVal(e.label) + '" style="' + style + '" edge="1" parent="1" source="' + nodeCell[e.from] + '" target="' + nodeCell[e.to] + '"><mxGeometry relative="1" as="geometry"/></mxCell>');
+    });
+
+    // 节点（最上层）
+    L.nodes.forEach(function (n) {
+      var role = OKABE[n.role] || OKABE.primary;
+      var emph = VIZ.emphasize.indexOf(n.role) >= 0;
+      var fill = n.role === 'flow' ? '#FFFFFF' : lighten(role, emph ? 0.74 : 0.86);
+      var swNode = emph ? fmt(L.strokePt * PX_PER_PT * 1.6) : fmt(L.strokePt * PX_PER_PT);
+      var style = dlShape(n.shape) + 'whiteSpace=wrap;html=1;fillColor=' + fill + ';strokeColor=' + role
+        + ';fontColor=#111111;strokeWidth=' + swNode + ';fontSize=' + fmt(L.font.body * PX_PER_PT) + ';'
+        + (emph ? 'fontStyle=1;' : '');
+      cell.push(vertex(nodeCell[n.id], n.label, style, n.x, n.y, n.w, n.h));
+    });
+
+    var pageW = Math.round(L.canvas.w), pageH = Math.round(L.canvas.h);
+    return '<?xml version="1.0" encoding="UTF-8"?>\n'
+      + '<mxfile host="app.diagrams.net" agent="SciFig/' + VERSION + '" version="24.7.17">\n'
+      + '  <diagram id="scifig" name="Page-1">\n'
+      + '    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="' + pageW + '" pageHeight="' + pageH + '" math="0" shadow="0">\n'
+      + '      <root>\n'
+      + '        <mxCell id="0"/>\n'
+      + '        <mxCell id="1" parent="0"/>\n'
+      + '        ' + cell.join('\n        ')
+      + '\n      </root>\n'
+      + '    </mxGraphModel>\n'
+      + '  </diagram>\n'
+      + '</mxfile>\n';
+  }
+
+  return {
+    version: VERSION, SCHEMA: SCHEMA,
+    init: init, validate: validate, measure: measure,
+    layout: layout, renderSVG: renderSVG, lint: lint, render: render, drawio: drawio,
+    constants: { PX_PER_PT: PX_PER_PT, FONT_MIN: FONT_MIN, FONT_MAX: FONT_MAX, STROKE_MIN: STROKE_MIN, OKABE: OKABE, SHAPES: SHAPES, ROLES: ROLES, EDGE_KINDS: EDGE_KINDS, ROUTINGS: ROUTINGS, PRESETS: PRESETS }
+  };
+});
+
+</script>
+<script>
+/* SciTiff：极简 TIFF 编码器（纯 JS，零依赖，Node / 浏览器通用 UMD）
+ *
+ * 输入 RGBA 像素 + 宽高，输出 RGB + PackBits 无损压缩的 TIFF 字节流（little-endian）。
+ * 供 sci-diagram / sci-statchart 的「导出 TIFF」共用——Node 侧用 @resvg/resvg-js 的
+ * render().pixels 喂进来，浏览器侧用 canvas getImageData 喂进来。
+ *
+ * 输出格式：RGB(Photometric=2) + PackBits(Compression=32773) + 分辨率单位 inch，
+ * 是期刊普遍接受的无损 TIFF（Photoshop/ImageMagick/预览均可打开）。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.SciTiff = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // PackBits 压缩（RFC 1951 无关的 TIFF PackBits，按字节行）
+  // run(2..128 相同字节) -> 控制字节 257-n + 1 字节
+  // literal(1..128 不同字节) -> 控制字节 n-1 + n 字节
+  function packBits(src) {
+    var n = src.length;
+    var out = new Uint8Array(n + Math.ceil(n / 128) + 16);
+    var p = 0, i = 0;
+    while (i < n) {
+      var run = 1;
+      while (i + run < n && src[i + run] === src[i] && run < 128) run++;
+      if (run >= 2) {
+        out[p++] = 257 - run;
+        out[p++] = src[i];
+        i += run;
+      } else {
+        var start = i, lit = 0;
+        while (i < n && lit < 128) {
+          if (i + 1 < n && src[i] === src[i + 1]) break;
+          i++; lit++;
+        }
+        out[p++] = lit - 1;
+        for (var k = 0; k < lit; k++) out[p++] = src[start + k];
+      }
+    }
+    return out.slice(0, p);
+  }
+
+  // width, height: 像素尺寸；rgba: Uint8Array，长度 width*height*4，逐像素 R,G,B,A
+  // opts: { dpi: 600 }（写入 XResolution/YResolution）
+  function encodeTiff(width, height, rgba, opts) {
+    opts = opts || {};
+    var dpi = opts.dpi || 600;
+    var px = width * height;
+
+    // RGBA -> RGB（白底合成，避免透明导致 TIFF 出现黑底）
+    var rgb = new Uint8Array(px * 3);
+    for (var i = 0, j = 0; i < px; i++, j += 3) {
+      var r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2], a = rgba[i * 4 + 3];
+      if (a === 255) { rgb[j] = r; rgb[j + 1] = g; rgb[j + 2] = b; }
+      else if (a === 0) { rgb[j] = 255; rgb[j + 1] = 255; rgb[j + 2] = 255; }
+      else {
+        var f = a / 255;
+        rgb[j] = Math.round(r * f + 255 * (1 - f));
+        rgb[j + 1] = Math.round(g * f + 255 * (1 - f));
+        rgb[j + 2] = Math.round(b * f + 255 * (1 - f));
+      }
+    }
+
+    // TIFF PackBits 规范：每一扫描行（row）独立压缩后按序拼接，不得跨行连续压。
+    var rowBytes = width * 3;
+    var packed = [];
+    var packedTotal = 0;
+    for (var y = 0; y < height; y++) {
+      var pr = packBits(rgb.subarray(y * rowBytes, (y + 1) * rowBytes));
+      packed.push(pr);
+      packedTotal += pr.length;
+    }
+
+    var N = 12;                       // IFD 条目数
+    var IFD_START = 8;                // 头 8 字节
+    var IFD_LEN = 2 + N * 12 + 4;     // count + entries + nextIFD = 150
+    var BPS_OFF = IFD_START + IFD_LEN;        // 158：BitsPerSample[8,8,8] 6 字节
+    var XRES_OFF = BPS_OFF + 6;               // 164：XResolution 8 字节
+    var YRES_OFF = XRES_OFF + 8;              // 172：YResolution 8 字节
+    var STRIP_OFF = YRES_OFF + 8;             // 180：像素数据起点
+
+    var total = STRIP_OFF + packedTotal;
+    var buf = new Uint8Array(total);
+    var dv = new DataView(buf.buffer);
+
+    buf[0] = 0x49; buf[1] = 0x49;             // "II" 小端
+    dv.setUint16(2, 42, true);
+    dv.setUint32(4, IFD_START, true);
+
+    dv.setUint16(IFD_START, N, true);
+    var e = IFD_START + 2;
+    function entry(tag, type, count, value) {
+      dv.setUint16(e, tag, true);
+      dv.setUint16(e + 2, type, true);
+      dv.setUint32(e + 4, count, true);
+      if (type === 3 && count === 1) dv.setUint16(e + 8, value, true);  // SHORT 内联
+      else dv.setUint32(e + 8, value, true);                            // LONG 内联 / 偏移
+      e += 12;
+    }
+    entry(256, 4, 1, width);          // ImageWidth
+    entry(257, 4, 1, height);         // ImageLength
+    entry(258, 3, 3, BPS_OFF);        // BitsPerSample = [8,8,8]
+    entry(259, 3, 1, 32773);          // Compression = PackBits
+    entry(262, 3, 1, 2);              // PhotometricInterpretation = RGB
+    entry(273, 4, 1, STRIP_OFF);      // StripOffsets
+    entry(277, 3, 1, 3);              // SamplesPerPixel = 3
+    entry(278, 4, 1, height);         // RowsPerStrip
+    entry(279, 4, 1, packedTotal);    // StripByteCounts
+    entry(282, 5, 1, XRES_OFF);       // XResolution = dpi/1
+    entry(283, 5, 1, YRES_OFF);       // YResolution = dpi/1
+    entry(296, 3, 1, 2);              // ResolutionUnit = inch
+    dv.setUint32(e, 0, true);         // next IFD = 0
+
+    dv.setUint16(BPS_OFF, 8, true);
+    dv.setUint16(BPS_OFF + 2, 8, true);
+    dv.setUint16(BPS_OFF + 4, 8, true);
+    dv.setUint32(XRES_OFF, dpi, true);
+    dv.setUint32(XRES_OFF + 4, 1, true);
+    dv.setUint32(YRES_OFF, dpi, true);
+    dv.setUint32(YRES_OFF + 4, 1, true);
+
+    var off = STRIP_OFF;
+    for (var ri = 0; ri < packed.length; ri++) {
+      buf.set(packed[ri], off);
+      off += packed[ri].length;
+    }
+    return buf;
+  }
+
+  return { encodeTiff: encodeTiff, packBits: packBits };
+});
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var METRICS = {"family":"Liberation Sans / Arial (metric compatible)","source":"Arial.ttf","unitsPerEm":2048,"defaultAdvance":0.2778,"cjkAdvance":1.0,"segments":[[32,33,0.2778],[34,34,0.355],[35,36,0.5562],[37,37,0.8892],[38,38,0.667],[39,39,0.1909],[40,41,0.333],[42,42,0.3892],[43,43,0.584],[44,44,0.2778],[45,45,0.333],[46,47,0.2778],[48,57,0.5562],[58,59,0.2778],[60,62,0.584],[63,63,0.5562],[64,64,1.0151],[65,66,0.667],[67,68,0.7222],[69,69,0.667],[70,70,0.6108],[71,71,0.7778],[72,72,0.7222],[73,73,0.2778],[74,74,0.5],[75,75,0.667],[76,76,0.5562],[77,77,0.833],[78,78,0.7222],[79,79,0.7778],[80,80,0.667],[81,81,0.7778],[82,82,0.7222],[83,83,0.667],[84,84,0.6108],[85,85,0.7222],[86,86,0.667],[87,87,0.9438],[88,89,0.667],[90,90,0.6108],[91,93,0.2778],[94,94,0.4692],[95,95,0.5562],[96,96,0.333],[97,98,0.5562],[99,99,0.5],[100,101,0.5562],[102,102,0.2778],[103,104,0.5562],[105,106,0.2222],[107,107,0.5],[108,108,0.2222],[109,109,0.833],[110,113,0.5562],[114,114,0.333],[115,115,0.5],[116,116,0.2778],[117,117,0.5562],[118,118,0.5],[119,119,0.7222],[120,122,0.5],[123,123,0.334],[124,124,0.2598],[125,125,0.334],[126,126,0.584],[160,160,0.2778],[161,161,0.333],[162,165,0.5562],[166,166,0.2598],[167,167,0.5562],[168,168,0.333],[169,169,0.7368],[170,170,0.3701],[171,171,0.5562],[172,172,0.584],[173,173,0.333],[174,174,0.7368],[175,175,0.5522],[176,176,0.3999],[177,177,0.5488],[178,180,0.333],[181,181,0.5762],[182,182,0.5371],[183,185,0.333],[186,186,0.3652],[187,187,0.5562],[188,190,0.834],[191,191,0.6108],[192,197,0.667],[198,198,1.0],[199,199,0.7222],[200,203,0.667],[204,207,0.2778],[208,209,0.7222],[210,214,0.7778],[215,215,0.584],[216,216,0.7778],[217,220,0.7222],[221,222,0.667],[223,223,0.6108],[224,229,0.5562],[230,230,0.8892],[231,231,0.5],[232,235,0.5562],[236,239,0.2778],[240,246,0.5562],[247,247,0.5488],[248,248,0.6108],[249,252,0.5562],[253,253,0.5],[254,254,0.5562],[255,255,0.5],[256,256,0.667],[257,257,0.5562],[258,258,0.667],[259,259,0.5562],[260,260,0.667],[261,261,0.5562],[262,262,0.7222],[263,263,0.5],[264,264,0.7222],[265,265,0.5],[266,266,0.7222],[267,267,0.5],[268,268,0.7222],[269,269,0.5],[270,270,0.7222],[271,271,0.6147],[272,272,0.7222],[273,273,0.5562],[274,274,0.667],[275,275,0.5562],[276,276,0.667],[277,277,0.5562],[278,278,0.667],[279,279,0.5562],[280,280,0.667],[281,281,0.5562],[282,282,0.667],[283,283,0.5562],[284,284,0.7778],[285,285,0.5562],[286,286,0.7778],[287,287,0.5562],[288,288,0.7778],[289,289,0.5562],[290,290,0.7778],[291,291,0.5562],[292,292,0.7222],[293,293,0.5562],[294,294,0.7222],[295,295,0.5562],[296,302,0.2778],[303,303,0.2222],[304,305,0.2778],[306,306,0.7349],[307,307,0.4438],[308,308,0.5],[309,309,0.2222],[310,310,0.667],[311,312,0.5],[313,313,0.5562],[314,314,0.2222],[315,315,0.5562],[316,316,0.2222],[317,317,0.5562],[318,318,0.2915],[319,319,0.5562],[320,320,0.334],[321,321,0.5562],[322,322,0.2222],[323,323,0.7222],[324,324,0.5562],[325,325,0.7222],[326,326,0.5562],[327,327,0.7222],[328,328,0.5562],[329,329,0.604],[330,330,0.7231],[331,331,0.5562],[332,332,0.7778],[333,333,0.5562],[334,334,0.7778],[335,335,0.5562],[336,336,0.7778],[337,337,0.5562],[338,338,1.0],[339,339,0.9438],[340,340,0.7222],[341,341,0.333],[342,342,0.7222],[343,343,0.333],[344,344,0.7222],[345,345,0.333],[346,346,0.667],[347,347,0.5],[348,348,0.667],[349,349,0.5],[350,350,0.667],[351,351,0.5],[352,352,0.667],[353,353,0.5],[354,354,0.6108],[355,355,0.2778],[356,356,0.6108],[357,357,0.375],[358,358,0.6108],[359,359,0.2778],[360,360,0.7222],[361,361,0.5562],[362,362,0.7222],[363,363,0.5562],[364,364,0.7222],[365,365,0.5562],[366,366,0.7222],[367,367,0.5562],[368,368,0.7222],[369,369,0.5562],[370,370,0.7222],[371,371,0.5562],[372,372,0.9438],[373,373,0.7222],[374,374,0.667],[375,375,0.5],[376,376,0.667],[377,377,0.6108],[378,378,0.5],[379,379,0.6108],[380,380,0.5],[381,381,0.6108],[382,382,0.5],[383,383,0.2222],[384,384,0.5562],[385,385,0.7583],[386,386,0.6562],[387,387,0.5562],[388,388,0.6562],[389,389,0.5562],[390,391,0.7222],[392,392,0.5],[393,393,0.7222],[394,394,0.8096],[395,395,0.6562],[396,396,0.5562],[397,397,0.5566],[398,398,0.667],[399,399,0.7524],[400,400,0.604],[401,401,0.6108],[402,402,0.5562],[403,403,0.7778],[404,404,0.624],[405,405,0.8809],[406,406,0.2222],[407,407,0.2778],[408,408,0.667],[409,409,0.5],[410,410,0.2222],[411,411,0.5],[412,412,0.8906],[413,413,0.7222],[414,414,0.5562],[415,415,0.7778],[416,416,0.8574],[417,417,0.6558],[418,418,0.8682],[419,419,0.6675],[420,420,0.7544],[421,421,0.5562],[422,423,0.667],[424,424,0.5],[425,425,0.6182],[426,426,0.3804],[427,427,0.2778],[428,428,0.6108],[429,429,0.2778],[430,430,0.6108],[431,431,0.854],[432,432,0.6694],[433,433,0.7476],[434,434,0.7222],[435,435,0.7725],[436,436,0.5],[437,437,0.6108],[438,438,0.5],[439,440,0.6108],[441,442,0.5449],[443,444,0.5562],[445,445,0.4585],[446,446,0.4868],[447,447,0.5562],[448,448,0.2598],[449,449,0.4131],[450,450,0.584],[451,451,0.2778],[452,452,1.333],[453,453,1.2222],[454,454,1.0488],[455,455,1.062],[456,456,0.833],[457,457,0.4512],[458,458,1.2222],[459,459,0.9443],[460,460,0.771],[461,461,0.667],[462,462,0.5562],[463,463,0.2778],[464,464,0.2222],[465,465,0.7778],[466,466,0.5562],[467,467,0.7222],[468,468,0.5562],[469,469,0.7222],[470,470,0.5562],[471,471,0.7222],[472,472,0.5562],[473,473,0.7222],[474,474,0.5562],[475,475,0.7222],[476,477,0.5562],[478,478,0.667],[479,479,0.5562],[480,480,0.667],[481,481,0.5562],[482,482,1.0],[483,483,0.8892],[484,484,0.7778],[485,485,0.5562],[486,486,0.7778],[487,487,0.5562],[488,488,0.667],[489,489,0.5],[490,490,0.7778],[491,491,0.5562],[492,492,0.7778],[493,493,0.5562],[494,494,0.6108],[495,495,0.5449],[496,496,0.2222],[497,497,1.333],[498,498,1.2222],[499,499,1.0488],[500,500,0.7778],[501,501,0.5562],[502,502,1.0342],[503,503,0.6182],[504,504,0.7222],[505,505,0.5562],[506,506,0.667],[507,507,0.5562],[508,508,1.0],[509,509,0.8892],[510,510,0.7778],[511,511,0.6108],[512,512,0.667],[513,513,0.5562],[514,514,0.667],[515,515,0.5562],[516,516,0.667],[517,517,0.5562],[518,518,0.667],[519,519,0.5562],[520,523,0.2778],[524,524,0.7778],[525,525,0.5562],[526,526,0.7778],[527,527,0.5562],[528,528,0.7222],[529,529,0.333],[530,530,0.7222],[531,531,0.333],[532,532,0.7222],[533,533,0.5562],[534,534,0.7222],[535,535,0.5562],[536,536,0.667],[537,537,0.5],[538,538,0.6108],[539,539,0.2778],[540,540,0.5449],[541,541,0.4365],[542,542,0.7222],[543,543,0.5562],[544,544,0.7061],[545,545,0.6816],[546,546,0.6045],[547,547,0.5654],[548,548,0.6108],[549,549,0.5],[550,550,0.667],[551,551,0.5562],[552,552,0.667],[553,553,0.5562],[554,554,0.7778],[555,555,0.5562],[556,556,0.7778],[557,557,0.5562],[558,558,0.7778],[559,559,0.5562],[560,560,0.7778],[561,561,0.5562],[562,562,0.667],[563,563,0.5],[564,564,0.3491],[565,565,0.6846],[566,566,0.3672],[567,567,0.2222],[568,569,0.8867],[570,570,0.667],[571,571,0.7222],[572,572,0.5],[573,573,0.5562],[574,574,0.6108],[575,576,0.5],[577,577,0.5806],[578,578,0.4531],[579,579,0.667],[580,580,0.7222],[581,581,0.668],[582,582,0.667],[583,583,0.5562],[584,584,0.5],[585,585,0.2222],[586,586,0.7373],[587,587,0.5562],[588,588,0.7222],[589,589,0.333],[590,590,0.667],[591,591,0.5],[592,595,0.5562],[596,597,0.5],[598,601,0.5562],[602,602,0.7388],[603,604,0.4585],[605,605,0.6313],[606,606,0.5073],[607,607,0.2778],[608,609,0.5562],[610,610,0.5586],[611,611,0.501],[612,612,0.6167],[613,615,0.5562],[616,618,0.2222],[619,619,0.3271],[620,620,0.3037],[621,621,0.2222],[622,622,0.5718],[623,625,0.833],[626,627,0.5562],[628,628,0.5527],[629,629,0.5562],[630,630,0.7905],[631,631,0.7808],[632,632,0.5498],[633,639,0.333],[640,641,0.5415],[642,642,0.5],[643,643,0.2222],[644,644,0.2598],[645,645,0.2222],[646,646,0.3491],[647,648,0.2778],[649,649,0.5562],[650,650,0.5684],[651,651,0.5469],[652,652,0.5],[653,653,0.7222],[654,654,0.5],[655,655,0.5195],[656,656,0.5],[657,657,0.541],[658,659,0.5449],[660,663,0.5],[664,664,0.7778],[665,665,0.5312],[666,666,0.5073],[667,667,0.5586],[668,668,0.5522],[669,669,0.3975],[670,670,0.5],[671,671,0.4038],[672,672,0.5562],[673,674,0.5],[675,675,0.9644],[676,676,0.9062],[677,677,1.0054],[678,678,0.7124],[679,679,0.4292],[680,680,0.7188],[681,681,0.7637],[682,682,0.6611],[683,683,0.6323],[684,684,0.4854],[685,685,0.5273],[686,687,0.687],[688,689,0.3833],[690,690,0.1592],[691,693,0.2397],[694,694,0.3643],[695,695,0.481],[696,696,0.3208],[697,697,0.1909],[698,698,0.355],[699,701,0.2222],[702,703,0.333],[704,705,0.3486],[706,709,0.584],[710,719,0.333],[720,721,0.2778],[722,735,0.333],[736,736,0.3223],[737,737,0.1572],[738,738,0.3398],[739,739,0.3281],[740,740,0.3486],[741,745,0.3828],[746,759,0.333],[760,760,0.2778],[761,764,0.333],[765,766,0.3975],[767,767,0.333],[768,879,0.0],[884,885,0.333],[890,890,0.333],[891,893,0.5],[894,894,0.2778],[900,901,0.333],[902,902,0.6675],[903,903,0.2778],[904,904,0.7842],[905,905,0.8379],[906,906,0.3838],[908,908,0.7744],[910,910,0.8555],[911,911,0.7524],[912,912,0.2222],[913,914,0.667],[915,915,0.5508],[916,916,0.668],[917,917,0.667],[918,918,0.6108],[919,919,0.7222],[920,920,0.7778],[921,921,0.2778],[922,922,0.667],[923,923,0.668],[924,924,0.833],[925,925,0.7222],[926,926,0.6499],[927,927,0.7778],[928,928,0.7222],[929,929,0.667],[931,931,0.6182],[932,932,0.6108],[933,933,0.667],[934,934,0.7979],[935,935,0.667],[936,936,0.8354],[937,937,0.7476],[938,938,0.2778],[939,939,0.667],[940,940,0.5781],[941,941,0.4458],[942,942,0.5562],[943,943,0.2222],[944,944,0.5469],[945,945,0.5781],[946,946,0.5752],[947,947,0.5],[948,948,0.5566],[949,949,0.4458],[950,950,0.4409],[951,952,0.5562],[953,953,0.2222],[954,955,0.5],[956,956,0.5762],[957,957,0.5],[958,958,0.4478],[959,959,0.5562],[960,960,0.6899],[961,961,0.5688],[962,962,0.4819],[963,963,0.6172],[964,964,0.395],[965,965,0.5469],[966,966,0.6484],[967,967,0.5249],[968,968,0.7129],[969,969,0.7808],[970,970,0.2222],[971,971,0.5469],[972,972,0.5562],[973,973,0.5469],[974,974,0.7808],[976,976,0.5752],[977,977,0.5469],[978,978,0.7725],[979,979,0.958],[980,980,0.7725],[981,981,0.5601],[982,982,0.7808],[983,983,0.6011],[984,984,0.7778],[985,985,0.5562],[986,986,0.7222],[987,987,0.5],[988,988,0.6108],[989,989,0.4038],[990,990,0.6245],[991,991,0.5293],[992,992,0.7563],[993,993,0.5767],[994,994,0.8906],[995,995,0.833],[996,996,0.6743],[997,997,0.5562],[998,998,0.6738],[999,999,0.5],[1000,1001,0.667],[1002,1002,0.6094],[1003,1003,0.5962],[1004,1004,0.7368],[1005,1005,0.5537],[1006,1006,0.4639],[1007,1007,0.4097],[1008,1008,0.6011],[1009,1009,0.5728],[1010,1010,0.5],[1011,1011,0.2222],[1012,1012,0.7778],[1013,1014,0.4419],[1015,1015,0.667],[1016,1016,0.5562],[1017,1017,0.7222],[1018,1018,0.833],[1019,1019,0.6875],[1020,1020,0.5688],[1021,1023,0.7222],[1024,1024,0.667],[1025,1025,0.6675],[1026,1026,0.8647],[1027,1027,0.5415],[1028,1028,0.7188],[1029,1029,0.667],[1030,1031,0.2778],[1032,1032,0.5],[1033,1033,1.0571],[1034,1034,1.0103],[1035,1035,0.854],[1036,1036,0.5825],[1037,1037,0.7188],[1038,1038,0.6353],[1039,1039,0.7188],[1040,1040,0.667],[1041,1041,0.6562],[1042,1042,0.667],[1043,1043,0.5415],[1044,1044,0.6772],[1045,1045,0.667],[1046,1046,0.9233],[1047,1047,0.604],[1048,1049,0.7188],[1050,1050,0.5825],[1051,1051,0.6562],[1052,1052,0.833],[1053,1053,0.7222],[1054,1054,0.7778],[1055,1055,0.7188],[1056,1056,0.667],[1057,1057,0.7222],[1058,1058,0.6108],[1059,1059,0.6353],[1060,1060,0.7603],[1061,1061,0.667],[1062,1062,0.7397],[1063,1063,0.6665],[1064,1064,0.9165],[1065,1065,0.9375],[1066,1066,0.7915],[1067,1067,0.8853],[1068,1068,0.6562],[1069,1069,0.7188],[1070,1070,1.0103],[1071,1071,0.7222],[1072,1072,0.5562],[1073,1073,0.5728],[1074,1074,0.5312],[1075,1075,0.3647],[1076,1076,0.5835],[1077,1077,0.5562],[1078,1078,0.6689],[1079,1079,0.4585],[1080,1081,0.5586],[1082,1082,0.4375],[1083,1083,0.5835],[1084,1084,0.6875],[1085,1085,0.5522],[1086,1086,0.5562],[1087,1087,0.5415],[1088,1088,0.5562],[1089,1089,0.5],[1090,1090,0.458],[1091,1091,0.5],[1092,1092,0.8228],[1093,1093,0.5],[1094,1094,0.5728],[1095,1095,0.521],[1096,1096,0.8022],[1097,1097,0.8228],[1098,1098,0.625],[1099,1099,0.7188],[1100,1100,0.521],[1101,1101,0.5103],[1102,1102,0.75],[1103,1103,0.5415],[1104,1106,0.5562],[1107,1107,0.3647],[1108,1108,0.5103],[1109,1109,0.5],[1110,1110,0.2222],[1111,1111,0.2778],[1112,1112,0.2222],[1113,1113,0.9062],[1114,1114,0.8125],[1115,1115,0.5562],[1116,1116,0.4375],[1117,1117,0.5586],[1118,1118,0.5],[1119,1119,0.5522],[1120,1120,1.3379],[1121,1121,0.624],[1122,1122,0.7778],[1123,1123,0.6128],[1124,1124,0.9497],[1125,1125,0.7134],[1126,1126,0.668],[1127,1127,0.5],[1128,1128,0.8975],[1129,1129,0.6953],[1130,1130,0.8286],[1131,1131,0.6851],[1132,1132,1.0532],[1133,1133,0.8672],[1134,1134,0.604],[1135,1135,0.4585],[1136,1136,0.7964],[1137,1137,0.6885],[1138,1138,0.7778],[1139,1139,0.5562],[1140,1140,0.8032],[1141,1141,0.6309],[1142,1142,0.8032],[1143,1143,0.6309],[1144,1144,1.3755],[1145,1145,1.1387],[1146,1146,0.833],[1147,1147,0.6123],[1148,1148,1.1909],[1149,1149,0.8516],[1150,1150,1.3379],[1151,1151,0.624],[1152,1152,0.7222],[1153,1153,0.5],[1154,1154,0.5034],[1155,1158,0.0],[1160,1161,0.0],[1162,1162,0.7188],[1163,1163,0.5586],[1164,1164,0.6562],[1165,1165,0.521],[1166,1166,0.667],[1167,1167,0.5562],[1168,1168,0.4888],[1169,1169,0.4111],[1170,1170,0.5415],[1171,1171,0.3647],[1172,1172,0.6704],[1173,1173,0.5488],[1174,1174,0.9233],[1175,1175,0.6689],[1176,1176,0.604],[1177,1177,0.4585],[1178,1178,0.5825],[1179,1179,0.4375],[1180,1180,0.5825],[1181,1181,0.4375],[1182,1182,0.5825],[1183,1183,0.4375],[1184,1184,0.7417],[1185,1185,0.5356],[1186,1186,0.7222],[1187,1187,0.5522],[1188,1188,0.8794],[1189,1189,0.6479],[1190,1190,1.1367],[1191,1191,0.8701],[1192,1192,0.7529],[1193,1193,0.521],[1194,1194,0.7222],[1195,1195,0.5],[1196,1196,0.6108],[1197,1197,0.458],[1198,1198,0.5562],[1199,1199,0.5],[1200,1200,0.5562],[1201,1201,0.5],[1202,1202,0.667],[1203,1203,0.5],[1204,1204,0.9253],[1205,1205,0.6909],[1206,1206,0.6665],[1207,1207,0.521],[1208,1208,0.6665],[1209,1209,0.521],[1210,1210,0.6665],[1211,1211,0.5562],[1212,1212,0.8613],[1213,1213,0.666],[1214,1214,0.8613],[1215,1215,0.666],[1216,1216,0.2778],[1217,1217,0.9233],[1218,1218,0.6689],[1219,1219,0.6675],[1220,1220,0.5508],[1221,1221,0.6562],[1222,1222,0.5835],[1223,1223,0.7222],[1224,1224,0.5522],[1225,1225,0.7222],[1226,1226,0.5522],[1227,1227,0.6665],[1228,1228,0.521],[1229,1229,0.833],[1230,1230,0.6875],[1231,1231,0.2222],[1232,1232,0.667],[1233,1233,0.5562],[1234,1234,0.667],[1235,1235,0.5562],[1236,1236,1.0],[1237,1237,0.8892],[1238,1238,0.667],[1239,1239,0.5562],[1240,1240,0.7524],[1241,1241,0.5562],[1242,1242,0.7524],[1243,1243,0.5562],[1244,1244,0.9233],[1245,1245,0.6689],[1246,1246,0.604],[1247,1247,0.4585],[1248,1248,0.604],[1249,1249,0.5449],[1250,1250,0.7188],[1251,1251,0.5586],[1252,1252,0.7188],[1253,1253,0.5586],[1254,1254,0.7778],[1255,1255,0.5562],[1256,1256,0.7778],[1257,1257,0.5562],[1258,1258,0.7778],[1259,1259,0.5562],[1260,1260,0.7188],[1261,1261,0.5103],[1262,1262,0.6353],[1263,1263,0.5],[1264,1264,0.6353],[1265,1265,0.5],[1266,1266,0.6353],[1267,1267,0.5],[1268,1268,0.6665],[1269,1269,0.521],[1270,1270,0.5415],[1271,1271,0.3647],[1272,1272,0.8853],[1273,1273,0.7188],[1274,1274,0.5415],[1275,1275,0.3647],[1276,1276,0.667],[1277,1277,0.5],[1278,1278,0.667],[1279,1279,0.5],[1280,1280,0.6562],[1281,1281,0.5562],[1282,1282,0.9683],[1283,1283,0.8765],[1284,1284,0.9561],[1285,1285,0.8154],[1286,1286,0.6626],[1287,1287,0.5093],[1288,1288,0.9702],[1289,1289,0.9097],[1290,1290,1.0342],[1291,1291,0.8784],[1292,1292,0.7778],[1293,1293,0.5586],[1294,1294,0.7466],[1295,1295,0.6655],[1296,1296,0.604],[1297,1297,0.4585],[1298,1298,0.6562],[1299,1299,0.5835],[1425,1469,0.0],[1470,1470,0.3828],[1471,1471,0.0],[1472,1472,0.2749],[1473,1474,0.0],[1475,1475,0.2778],[1476,1477,0.0],[1478,1478,0.3525],[1479,1479,0.0],[1488,1488,0.563],[1489,1489,0.542],[1490,1490,0.3989],[1491,1491,0.5083],[1492,1492,0.6021],[1493,1493,0.2466],[1494,1494,0.3823],[1495,1495,0.5986],[1496,1496,0.5898],[1497,1497,0.2466],[1498,1498,0.5093],[1499,1499,0.4609],[1500,1500,0.4629],[1501,1501,0.5986],[1502,1502,0.6011],[1503,1503,0.2466],[1504,1504,0.3525],[1505,1505,0.5742],[1506,1506,0.5293],[1507,1507,0.5664],[1508,1508,0.5464],[1509,1509,0.4614],[1510,1510,0.4785],[1511,1511,0.5498],[1512,1512,0.5093],[1513,1513,0.6943],[1514,1514,0.6426],[1520,1522,0.4932],[1523,1523,0.2358],[1524,1524,0.417],[1536,1536,0.7407],[1537,1537,1.2998],[1538,1538,0.7593],[1539,1539,0.8169],[1547,1547,0.2627],[1548,1548,0.3188],[1549,1549,0.2388],[1550,1550,0.6567],[1551,1551,0.5439],[1552,1556,0.0],[1557,1557,0.269],[1563,1563,0.3188],[1566,1566,0.2891],[1567,1567,0.3564],[1569,1569,0.4126],[1570,1571,0.207],[1572,1572,0.4321],[1573,1573,0.207],[1574,1574,0.6382],[1575,1575,0.207],[1576,1576,0.7134],[1577,1577,0.2822],[1578,1579,0.7134],[1580,1582,0.563],[1583,1584,0.3374],[1585,1586,0.4888],[1587,1588,0.8213],[1589,1590,1.0981],[1591,1592,0.5815],[1593,1594,0.5439],[1600,1600,0.207],[1601,1601,0.7886],[1602,1602,0.5815],[1603,1603,0.6011],[1604,1604,0.5063],[1605,1605,0.3379],[1606,1606,0.5259],[1607,1607,0.2822],[1608,1608,0.4321],[1609,1610,0.6382],[1611,1630,0.0],[1632,1642,0.5259],[1643,1644,0.3188],[1645,1645,0.5259],[1646,1646,0.7134],[1647,1647,0.5815],[1648,1648,0.0],[1649,1651,0.207],[1652,1652,0.0],[1653,1653,0.207],[1654,1655,0.4321],[1656,1656,0.6382],[1657,1664,0.7134],[1665,1671,0.563],[1672,1680,0.3374],[1681,1689,0.4888],[1690,1692,0.8213],[1693,1694,1.0981],[1695,1695,0.5815],[1696,1696,0.5439],[1697,1702,0.7886],[1703,1704,0.5815],[1705,1705,0.812],[1706,1706,1.1553],[1707,1707,0.812],[1708,1710,0.6011],[1711,1716,0.812],[1717,1720,0.5063],[1721,1725,0.5259],[1726,1726,0.4502],[1727,1727,0.563],[1728,1728,0.2822],[1729,1731,0.3877],[1732,1739,0.4321],[1740,1742,0.6382],[1743,1743,0.4321],[1744,1745,0.6382],[1746,1747,0.812],[1748,1748,0.207],[1749,1749,0.2822],[1750,1756,0.0],[1757,1757,1.123],[1758,1758,1.0845],[1759,1764,0.0],[1765,1765,0.1938],[1766,1766,0.3701],[1767,1768,0.0],[1769,1769,0.6001],[1770,1773,0.0],[1774,1774,0.3374],[1775,1775,0.4888],[1776,1785,0.5259],[1786,1786,0.8213],[1787,1787,1.0981],[1788,1788,0.5439],[1789,1789,0.4126],[1790,1790,0.3379],[1791,1791,0.4502],[1872,1878,0.7134],[1879,1880,0.563],[1881,1882,0.3374],[1883,1883,0.4888],[1884,1884,0.8213],[1885,1887,0.5439],[1888,1889,0.7886],[1890,1892,0.812],[1893,1894,0.3379],[1895,1897,0.5259],[1898,1898,0.5063],[1899,1900,0.4888],[1901,1901,0.8213],[7424,7424,0.4961],[7425,7425,0.7476],[7426,7426,0.8892],[7427,7427,0.5312],[7428,7428,0.5],[7429,7430,0.5513],[7431,7431,0.4897],[7432,7432,0.4585],[7433,7433,0.2222],[7434,7434,0.4224],[7435,7435,0.5],[7436,7436,0.4014],[7437,7437,0.6875],[7438,7438,0.5586],[7439,7439,0.5562],[7440,7440,0.5],[7441,7443,0.6084],[7444,7444,0.9438],[7445,7445,0.457],[7446,7447,0.5562],[7448,7448,0.521],[7449,7450,0.5415],[7451,7451,0.458],[7452,7452,0.5469],[7453,7453,0.5967],[7454,7454,0.7334],[7455,7455,0.5967],[7456,7456,0.5],[7457,7457,0.7222],[7458,7458,0.5],[7459,7459,0.4585],[7460,7460,0.4272],[7461,7461,0.6069],[7462,7462,0.3647],[7463,7463,0.5],[7464,7464,0.5415],[7465,7465,0.521],[7466,7466,0.7129],[7467,7467,0.5835],[7468,7468,0.4531],[7469,7469,0.6636],[7470,7471,0.4146],[7472,7472,0.4492],[7473,7474,0.4102],[7475,7475,0.4961],[7476,7476,0.4287],[7477,7477,0.167],[7478,7478,0.3145],[7479,7479,0.4248],[7480,7480,0.3516],[7481,7481,0.5103],[7482,7482,0.4302],[7483,7483,0.4292],[7484,7484,0.5117],[7485,7485,0.3823],[7486,7486,0.4185],[7487,7487,0.4512],[7488,7488,0.4326],[7489,7489,0.4292],[7490,7490,0.6226],[7491,7492,0.3721],[7493,7493,0.377],[7494,7494,0.5996],[7495,7496,0.3774],[7497,7498,0.3716],[7499,7500,0.3184],[7501,7501,0.377],[7502,7502,0.1572],[7503,7503,0.3389],[7504,7504,0.5728],[7505,7505,0.3823],[7506,7506,0.3774],[7507,7507,0.354],[7508,7509,0.3774],[7510,7510,0.3779],[7511,7511,0.2197],[7512,7512,0.3823],[7513,7513,0.4072],[7514,7514,0.5728],[7515,7515,0.3213],[7516,7516,0.3906],[7517,7517,0.3853],[7518,7518,0.3213],[7519,7519,0.3779],[7520,7520,0.4399],[7521,7521,0.3433],[7522,7522,0.1572],[7523,7523,0.2397],[7524,7524,0.3823],[7525,7525,0.3213],[7526,7526,0.3853],[7527,7527,0.3213],[7528,7528,0.3794],[7529,7529,0.4399],[7530,7530,0.3433],[7531,7531,0.9082],[7532,7533,0.5562],[7534,7534,0.2778],[7535,7535,0.833],[7536,7537,0.5562],[7538,7539,0.333],[7540,7540,0.5],[7541,7541,0.2778],[7542,7542,0.5],[7543,7543,0.5562],[7544,7544,0.3804],[7545,7545,0.5566],[7546,7546,0.7856],[7547,7548,0.2222],[7549,7549,0.5562],[7550,7550,0.5469],[7551,7551,0.5684],[7552,7553,0.5562],[7554,7554,0.2778],[7555,7555,0.7129],[7556,7556,0.5],[7557,7557,0.2222],[7558,7558,0.833],[7559,7560,0.5562],[7561,7561,0.333],[7562,7562,0.5],[7563,7563,0.3867],[7564,7566,0.5],[7567,7570,0.5562],[7571,7572,0.4585],[7573,7573,0.6504],[7574,7574,0.2222],[7575,7575,0.5],[7576,7576,0.2222],[7577,7577,0.5562],[7578,7578,0.5449],[7579,7579,0.377],[7580,7580,0.354],[7581,7581,0.3481],[7582,7582,0.373],[7583,7583,0.3184],[7584,7585,0.229],[7586,7586,0.377],[7587,7587,0.3833],[7588,7591,0.1572],[7592,7592,0.2705],[7593,7594,0.1572],[7595,7595,0.2749],[7596,7597,0.5718],[7598,7599,0.3823],[7600,7600,0.3818],[7601,7601,0.3774],[7602,7602,0.375],[7603,7603,0.3398],[7604,7604,0.1572],[7605,7605,0.2197],[7606,7606,0.3823],[7607,7607,0.3877],[7608,7608,0.3779],[7609,7609,0.3535],[7610,7610,0.3213],[7611,7613,0.3584],[7614,7614,0.3691],[7615,7615,0.3643],[7616,7626,0.0],[7678,7679,0.0],[7680,7680,0.667],[7681,7681,0.5562],[7682,7682,0.667],[7683,7683,0.5562],[7684,7684,0.667],[7685,7685,0.5562],[7686,7686,0.667],[7687,7687,0.5562],[7688,7688,0.7222],[7689,7689,0.5],[7690,7690,0.7222],[7691,7691,0.5562],[7692,7692,0.7222],[7693,7693,0.5562],[7694,7694,0.7222],[7695,7695,0.5562],[7696,7696,0.7222],[7697,7697,0.5562],[7698,7698,0.7222],[7699,7699,0.5562],[7700,7700,0.667],[7701,7701,0.5562],[7702,7702,0.667],[7703,7703,0.5562],[7704,7704,0.667],[7705,7705,0.5562],[7706,7706,0.667],[7707,7707,0.5562],[7708,7708,0.667],[7709,7709,0.5562],[7710,7710,0.6108],[7711,7711,0.2778],[7712,7712,0.7778],[7713,7713,0.5562],[7714,7714,0.7222],[7715,7715,0.5562],[7716,7716,0.7222],[7717,7717,0.5562],[7718,7718,0.7222],[7719,7719,0.5562],[7720,7720,0.7222],[7721,7721,0.5562],[7722,7722,0.7222],[7723,7723,0.5562],[7724,7724,0.2778],[7725,7725,0.2222],[7726,7727,0.2778],[7728,7728,0.667],[7729,7729,0.5],[7730,7730,0.667],[7731,7731,0.5],[7732,7732,0.667],[7733,7733,0.5],[7734,7734,0.5562],[7735,7735,0.2222],[7736,7736,0.5562],[7737,7737,0.2222],[7738,7738,0.5562],[7739,7739,0.2222],[7740,7740,0.5562],[7741,7741,0.2222],[7742,7747,0.833],[7748,7748,0.7222],[7749,7749,0.5562],[7750,7750,0.7222],[7751,7751,0.5562],[7752,7752,0.7222],[7753,7753,0.5562],[7754,7754,0.7222],[7755,7755,0.5562],[7756,7756,0.7778],[7757,7757,0.5562],[7758,7758,0.7778],[7759,7759,0.5562],[7760,7760,0.7778],[7761,7761,0.5562],[7762,7762,0.7778],[7763,7763,0.5562],[7764,7764,0.667],[7765,7765,0.5562],[7766,7766,0.667],[7767,7767,0.5562],[7768,7768,0.7222],[7769,7769,0.333],[7770,7770,0.7222],[7771,7771,0.333],[7772,7772,0.7222],[7773,7773,0.333],[7774,7774,0.7222],[7775,7775,0.333],[7776,7776,0.667],[7777,7777,0.5],[7778,7778,0.667],[7779,7779,0.5],[7780,7780,0.667],[7781,7781,0.5],[7782,7782,0.667],[7783,7783,0.5],[7784,7784,0.667],[7785,7785,0.5],[7786,7786,0.6108],[7787,7787,0.2778],[7788,7788,0.6108],[7789,7789,0.2778],[7790,7790,0.6108],[7791,7791,0.2778],[7792,7792,0.6108],[7793,7793,0.2778],[7794,7794,0.7222],[7795,7795,0.5562],[7796,7796,0.7222],[7797,7797,0.5562],[7798,7798,0.7222],[7799,7799,0.5562],[7800,7800,0.7222],[7801,7801,0.5562],[7802,7802,0.7222],[7803,7803,0.5562],[7804,7804,0.667],[7805,7805,0.5],[7806,7806,0.667],[7807,7807,0.5],[7808,7808,0.9438],[7809,7809,0.7222],[7810,7810,0.9438],[7811,7811,0.7222],[7812,7812,0.9438],[7813,7813,0.7222],[7814,7814,0.9438],[7815,7815,0.7222],[7816,7816,0.9438],[7817,7817,0.7222],[7818,7818,0.667],[7819,7819,0.5],[7820,7820,0.667],[7821,7821,0.5],[7822,7822,0.667],[7823,7823,0.5],[7824,7824,0.6108],[7825,7825,0.5],[7826,7826,0.6108],[7827,7827,0.5],[7828,7828,0.6108],[7829,7829,0.5],[7830,7830,0.5562],[7831,7831,0.2778],[7832,7832,0.7222],[7833,7833,0.5],[7834,7834,0.5562],[7835,7835,0.2222],[7840,7840,0.667],[7841,7841,0.5562],[7842,7842,0.667],[7843,7843,0.5562],[7844,7844,0.667],[7845,7845,0.5562],[7846,7846,0.667],[7847,7847,0.5562],[7848,7848,0.667],[7849,7849,0.5562],[7850,7850,0.667],[7851,7851,0.5562],[7852,7852,0.667],[7853,7853,0.5562],[7854,7854,0.667],[7855,7855,0.5562],[7856,7856,0.667],[7857,7857,0.5562],[7858,7858,0.667],[7859,7859,0.5562],[7860,7860,0.667],[7861,7861,0.5562],[7862,7862,0.667],[7863,7863,0.5562],[7864,7864,0.667],[7865,7865,0.5562],[7866,7866,0.667],[7867,7867,0.5562],[7868,7868,0.667],[7869,7869,0.5562],[7870,7870,0.667],[7871,7871,0.5562],[7872,7872,0.667],[7873,7873,0.5562],[7874,7874,0.667],[7875,7875,0.5562],[7876,7876,0.667],[7877,7877,0.5562],[7878,7878,0.667],[7879,7879,0.5562],[7880,7880,0.2778],[7881,7881,0.2222],[7882,7882,0.2778],[7883,7883,0.2222],[7884,7884,0.7778],[7885,7885,0.5562],[7886,7886,0.7778],[7887,7887,0.5562],[7888,7888,0.7778],[7889,7889,0.5562],[7890,7890,0.7778],[7891,7891,0.5562],[7892,7892,0.7778],[7893,7893,0.5562],[7894,7894,0.7778],[7895,7895,0.5562],[7896,7896,0.7778],[7897,7897,0.5562],[7898,7898,0.8574],[7899,7899,0.6558],[7900,7900,0.8574],[7901,7901,0.6558],[7902,7902,0.8574],[7903,7903,0.6558],[7904,7904,0.8574],[7905,7905,0.6558],[7906,7906,0.8574],[7907,7907,0.6558],[7908,7908,0.7222],[7909,7909,0.5562],[7910,7910,0.7222],[7911,7911,0.5562],[7912,7912,0.854],[7913,7913,0.6694],[7914,7914,0.854],[7915,7915,0.6694],[7916,7916,0.854],[7917,7917,0.6694],[7918,7918,0.854],[7919,7919,0.6694],[7920,7920,0.854],[7921,7921,0.6694],[7922,7922,0.667],[7923,7923,0.5],[7924,7924,0.667],[7925,7925,0.5],[7926,7926,0.667],[7927,7927,0.5],[7928,7928,0.667],[7929,7929,0.5],[7936,7943,0.5781],[7944,7945,0.667],[7946,7951,0.8135],[7952,7957,0.4458],[7960,7961,0.7646],[7962,7965,0.9277],[7968,7975,0.5562],[7976,7977,0.8198],[7978,7983,1.0151],[7984,7991,0.2222],[7992,7993,0.3755],[7994,7999,0.5708],[8000,8005,0.5562],[8008,8009,0.8267],[8010,8011,1.022],[8012,8013,0.9731],[8016,8023,0.5469],[8025,8025,0.8135],[8027,8027,0.96],[8029,8029,1.0088],[8031,8031,0.96],[8032,8039,0.7808],[8040,8041,0.7964],[8042,8043,0.9917],[8044,8047,0.9429],[8048,8049,0.5781],[8050,8051,0.4458],[8052,8053,0.5562],[8054,8055,0.2222],[8056,8057,0.5562],[8058,8059,0.5469],[8060,8061,0.7808],[8064,8071,0.5781],[8072,8073,0.667],[8074,8079,0.8135],[8080,8087,0.5562],[8088,8089,0.8198],[8090,8095,1.0151],[8096,8103,0.7808],[8104,8105,0.7964],[8106,8107,0.9917],[8108,8111,0.9429],[8112,8116,0.5781],[8118,8119,0.5781],[8120,8124,0.667],[8125,8129,0.333],[8130,8132,0.5562],[8134,8135,0.5562],[8136,8137,0.8135],[8138,8139,0.8687],[8140,8140,0.7222],[8141,8143,0.333],[8144,8147,0.2222],[8150,8151,0.2222],[8152,8153,0.2778],[8154,8155,0.4243],[8157,8159,0.333],[8160,8163,0.5469],[8164,8165,0.5688],[8166,8167,0.5469],[8168,8169,0.667],[8170,8170,0.8623],[8171,8171,0.8867],[8172,8172,0.7646],[8173,8175,0.333],[8178,8180,0.7808],[8182,8183,0.7808],[8184,8184,0.9243],[8185,8185,0.8267],[8186,8186,0.894],[8187,8187,0.7964],[8188,8188,0.7476],[8189,8190,0.333],[8192,8192,0.5],[8193,8193,1.0],[8194,8194,0.5],[8195,8195,1.0],[8196,8196,0.3335],[8197,8197,0.25],[8198,8198,0.1665],[8199,8199,0.5562],[8200,8200,0.2778],[8201,8201,0.2002],[8202,8202,0.0835],[8203,8207,0.0],[8210,8211,0.5562],[8212,8213,1.0],[8214,8214,0.4131],[8215,8215,0.5522],[8216,8219,0.2222],[8220,8223,0.333],[8224,8225,0.5562],[8226,8226,0.3501],[8230,8230,1.0],[8234,8238,0.0],[8240,8240,1.0],[8242,8242,0.1875],[8243,8244,0.354],[8249,8250,0.333],[8252,8252,0.5],[8254,8254,0.333],[8260,8260,0.167],[8286,8286,0.2778],[8298,8303,0.0],[8319,8319,0.3647],[8336,8336,0.3721],[8337,8337,0.3716],[8338,8338,0.3774],[8339,8339,0.3281],[8340,8340,0.3716],[8352,8352,0.5562],[8353,8354,0.7222],[8355,8356,0.5562],[8357,8357,0.833],[8358,8358,0.7222],[8359,8359,1.0938],[8360,8360,1.1641],[8361,8361,0.9438],[8362,8362,0.8154],[8363,8363,0.5132],[8364,8364,0.5562],[8365,8365,0.667],[8366,8366,0.6108],[8367,8367,1.0],[8368,8368,0.521],[8369,8369,0.667],[8370,8370,0.7778],[8371,8371,0.667],[8372,8372,0.5562],[8373,8373,0.7222],[8453,8453,0.8853],[8467,8467,0.3232],[8470,8470,1.0728],[8471,8471,0.7368],[8482,8482,1.0],[8486,8486,0.7681],[8494,8494,0.6001],[8525,8525,0.9429],[8526,8526,0.4897],[8531,8532,0.834],[8539,8542,0.834],[8580,8580,0.5],[8592,8592,1.0],[8593,8593,0.5],[8594,8594,1.0],[8595,8595,0.5],[8596,8596,1.0],[8597,8597,0.5],[8616,8616,0.5],[8706,8706,0.4941],[8710,8710,0.6118],[8719,8719,0.8232],[8721,8721,0.7129],[8722,8722,0.584],[8725,8725,0.167],[8729,8729,0.2778],[8730,8730,0.5488],[8734,8734,0.7129],[8735,8735,0.979],[8745,8745,0.7188],[8747,8747,0.2739],[8776,8776,0.5488],[8800,8800,0.5488],[8801,8801,0.5835],[8804,8805,0.5488],[8962,8962,0.604],[8976,8976,0.584],[8992,8993,0.604],[9472,9472,0.7085],[9474,9474,0.625],[9484,9484,0.7085],[9488,9488,0.7085],[9492,9492,0.7085],[9496,9496,0.7085],[9500,9500,0.7085],[9508,9508,0.7085],[9516,9516,0.7085],[9524,9524,0.7085],[9532,9532,0.7085],[9552,9580,0.7085],[9600,9600,0.7085],[9604,9604,0.7085],[9608,9608,0.7085],[9612,9612,0.7085],[9616,9618,0.7085],[9619,9619,0.729],[9632,9633,0.604],[9642,9643,0.3545],[9644,9644,1.0],[9650,9650,0.9897],[9658,9658,0.9897],[9660,9660,0.9897],[9668,9668,0.9897],[9674,9674,0.4941],[9675,9675,0.604],[9676,9676,0.5942],[9679,9679,0.604],[9688,9689,0.604],[9702,9702,0.3545],[9786,9786,1.021],[9787,9787,1.0522],[9788,9788,0.9165],[9792,9792,0.75],[9794,9794,0.75],[9824,9824,0.5312],[9827,9827,0.6562],[9829,9829,0.5938],[9830,9830,0.5103],[9834,9834,0.5],[9835,9835,0.75],[9839,9839,0.5],[11360,11360,0.5562],[11361,11361,0.2222],[11362,11362,0.5562],[11363,11363,0.667],[11364,11364,0.7222],[11365,11365,0.5562],[11366,11366,0.2778],[11367,11367,0.7222],[11368,11368,0.5562],[11369,11369,0.667],[11370,11370,0.5],[11371,11371,0.6108],[11372,11372,0.5],[11380,11380,0.5],[11381,11381,0.5771],[11382,11382,0.4253],[11383,11383,0.6484],[11799,11799,0.333],[42775,42778,0.0],[42784,42785,0.0],[64257,64258,0.5],[64285,64285,0.2466],[64286,64286,0.0],[64287,64287,0.4932],[64288,64288,0.5352],[64289,64289,0.7095],[64290,64290,0.6548],[64291,64291,0.7485],[64292,64292,0.6074],[64293,64293,0.6094],[64294,64294,0.7451],[64295,64295,0.6558],[64296,64296,0.7891],[64297,64297,0.584],[64298,64301,0.6943],[64302,64304,0.563],[64305,64305,0.542],[64306,64306,0.3989],[64307,64307,0.5083],[64308,64308,0.6021],[64309,64309,0.2866],[64310,64310,0.4111],[64312,64312,0.5898],[64313,64313,0.2866],[64314,64314,0.5093],[64315,64315,0.4609],[64316,64316,0.4629],[64318,64318,0.6011],[64320,64320,0.3525],[64321,64321,0.5742],[64323,64323,0.5664],[64324,64324,0.5464],[64326,64326,0.4785],[64327,64327,0.5498],[64328,64328,0.5093],[64329,64329,0.6943],[64330,64330,0.6426],[64331,64331,0.2466],[64332,64332,0.542],[64333,64333,0.4609],[64334,64334,0.5464],[64335,64335,0.5757],[64336,64336,0.207],[64337,64337,0.2295],[64338,64339,0.7134],[64340,64341,0.2441],[64342,64343,0.7134],[64344,64345,0.2441],[64346,64347,0.7134],[64348,64349,0.2441],[64350,64351,0.7134],[64352,64353,0.2441],[64354,64355,0.7134],[64356,64357,0.2441],[64358,64359,0.7134],[64360,64361,0.2441],[64362,64363,0.7886],[64364,64364,0.2676],[64365,64365,0.2627],[64366,64367,0.7886],[64368,64368,0.2676],[64369,64369,0.2627],[64370,64370,0.563],[64371,64371,0.5259],[64372,64373,0.5298],[64374,64374,0.563],[64375,64375,0.5259],[64376,64377,0.5298],[64378,64378,0.563],[64379,64379,0.5259],[64380,64381,0.5298],[64382,64382,0.563],[64383,64383,0.5259],[64384,64385,0.5298],[64386,64393,0.3374],[64394,64397,0.4888],[64398,64398,0.812],[64399,64399,0.9326],[64400,64400,0.394],[64401,64401,0.5146],[64402,64402,0.812],[64403,64403,0.9326],[64404,64404,0.394],[64405,64405,0.5146],[64406,64406,0.812],[64407,64407,0.9326],[64408,64408,0.394],[64409,64409,0.5146],[64410,64410,0.812],[64411,64411,0.9326],[64412,64412,0.394],[64413,64413,0.5146],[64414,64417,0.5259],[64418,64419,0.2441],[64420,64420,0.2822],[64421,64421,0.375],[64422,64422,0.2822],[64423,64423,0.3877],[64424,64424,0.2441],[64425,64425,0.3203],[64426,64426,0.4502],[64427,64427,0.375],[64428,64428,0.4502],[64429,64429,0.394],[64430,64433,0.812],[64467,64468,0.6011],[64469,64470,0.394],[64471,64483,0.4321],[64484,64484,0.6382],[64485,64485,0.5884],[64486,64489,0.2441],[64508,64508,0.6382],[64509,64509,0.5884],[64510,64511,0.2441],[64606,64610,0.0],[64830,64831,0.3188],[65010,65010,0.793],[65020,65020,1.2212],[65056,65059,0.0],[65152,65152,0.4126],[65153,65153,0.207],[65154,65154,0.2295],[65155,65155,0.207],[65156,65156,0.2295],[65157,65158,0.4321],[65159,65159,0.207],[65160,65160,0.2295],[65161,65161,0.6382],[65162,65162,0.5884],[65163,65164,0.2441],[65165,65165,0.207],[65166,65166,0.2295],[65167,65168,0.7134],[65169,65170,0.2441],[65171,65171,0.2822],[65172,65172,0.375],[65173,65174,0.7134],[65175,65176,0.2441],[65177,65178,0.7134],[65179,65180,0.2441],[65181,65181,0.563],[65182,65182,0.5259],[65183,65184,0.5298],[65185,65185,0.563],[65186,65186,0.5259],[65187,65188,0.5298],[65189,65189,0.563],[65190,65190,0.5259],[65191,65192,0.5298],[65193,65196,0.3374],[65197,65200,0.4888],[65201,65202,0.8213],[65203,65204,0.5308],[65205,65206,0.8213],[65207,65208,0.5308],[65209,65210,1.0981],[65211,65212,0.8462],[65213,65214,1.0981],[65215,65216,0.8462],[65217,65224,0.5815],[65225,65225,0.5439],[65226,65226,0.4502],[65227,65227,0.5259],[65228,65228,0.394],[65229,65229,0.5439],[65230,65230,0.4502],[65231,65231,0.5259],[65232,65232,0.394],[65233,65234,0.7886],[65235,65235,0.2676],[65236,65236,0.2627],[65237,65238,0.5815],[65239,65239,0.2676],[65240,65240,0.2627],[65241,65242,0.6011],[65243,65244,0.394],[65245,65246,0.5063],[65247,65248,0.207],[65249,65250,0.3379],[65251,65252,0.394],[65253,65254,0.5259],[65255,65256,0.2441],[65257,65257,0.2822],[65258,65258,0.375],[65259,65259,0.4502],[65260,65260,0.394],[65261,65262,0.4321],[65263,65263,0.6382],[65264,65264,0.5884],[65265,65265,0.6382],[65266,65266,0.5884],[65267,65268,0.2441],[65269,65269,0.5439],[65270,65270,0.6006],[65271,65271,0.5439],[65272,65272,0.6006],[65273,65273,0.5439],[65274,65274,0.6006],[65275,65275,0.5439],[65276,65276,0.6006],[65532,65532,1.0]]};
+  var PRESETS = {
+  "screen": {
+    "label": "Screen (default, 800px)",
+    "width": { "value": 800, "unit": "px" },
+    "baseFont": 7, "smallFont": 5.5,
+    "layerGap": 76, "nodeGap": 30, "minLayerGap": 40, "minNodeGap": 12,
+    "nodePaddingX": 12, "nodePaddingY": 8,
+    "groupPadding": 10, "margin": 18, "stroke": 1
+  },
+  "ieee-single": {
+    "label": "IEEE single column (3.5in)",
+    "width": { "value": 3.5, "unit": "in" },
+    "baseFont": 7, "smallFont": 5,
+    "layerGap": 46, "nodeGap": 14, "minLayerGap": 30, "minNodeGap": 8,
+    "nodePaddingX": 8, "nodePaddingY": 5,
+    "groupPadding": 7, "margin": 10, "stroke": 1
+  },
+  "ieee-double": {
+    "label": "IEEE double column (7.16in)",
+    "width": { "value": 7.16, "unit": "in" },
+    "baseFont": 8, "smallFont": 5.5,
+    "layerGap": 64, "nodeGap": 22, "minLayerGap": 36, "minNodeGap": 10,
+    "nodePaddingX": 10, "nodePaddingY": 6,
+    "groupPadding": 8, "margin": 14, "stroke": 1
+  },
+  "springer-single": {
+    "label": "Springer Nature single (89mm)",
+    "width": { "value": 89, "unit": "mm" },
+    "baseFont": 5.5, "smallFont": 5,
+    "layerGap": 38, "nodeGap": 12, "minLayerGap": 26, "minNodeGap": 7,
+    "nodePaddingX": 6, "nodePaddingY": 4,
+    "groupPadding": 6, "margin": 8, "stroke": 0.6
+  },
+  "springer-double": {
+    "label": "Springer Nature double (183mm)",
+    "width": { "value": 183, "unit": "mm" },
+    "baseFont": 7, "smallFont": 5,
+    "layerGap": 56, "nodeGap": 18, "minLayerGap": 32, "minNodeGap": 9,
+    "nodePaddingX": 9, "nodePaddingY": 5,
+    "groupPadding": 8, "margin": 12, "stroke": 0.8
+  },
+  "elsevier-1": {
+    "label": "Elsevier 1 column (90mm)",
+    "width": { "value": 90, "unit": "mm" },
+    "baseFont": 6, "smallFont": 5,
+    "layerGap": 40, "nodeGap": 13, "minLayerGap": 28, "minNodeGap": 8,
+    "nodePaddingX": 7, "nodePaddingY": 4,
+    "groupPadding": 6, "margin": 10, "stroke": 0.8
+  },
+  "elsevier-1-5": {
+    "label": "Elsevier 1.5 column (140mm)",
+    "width": { "value": 140, "unit": "mm" },
+    "baseFont": 7, "smallFont": 5,
+    "layerGap": 50, "nodeGap": 16, "minLayerGap": 30, "minNodeGap": 9,
+    "nodePaddingX": 9, "nodePaddingY": 5,
+    "groupPadding": 7, "margin": 12, "stroke": 0.8
+  },
+  "elsevier-2": {
+    "label": "Elsevier full width (190mm)",
+    "width": { "value": 190, "unit": "mm" },
+    "baseFont": 8, "smallFont": 5.5,
+    "layerGap": 62, "nodeGap": 20, "minLayerGap": 34, "minNodeGap": 10,
+    "nodePaddingX": 10, "nodePaddingY": 6,
+    "groupPadding": 8, "margin": 14, "stroke": 1
+  }
+}
+;
+  var dsl = {
+  "schema": "scifig/v1",
+  "meta": {
+    "title": "Joint-Embedding Predictive Architecture (MicroJEPA)",
+    "preset": "screen",
+    "direction": "LR",
+    "locale": "en"
+  },
+  "style": {
+    "fontStack": "Arial, Helvetica, Liberation Sans, sans-serif",
+    "palette": "okabe-ito",
+    "fontSize": {
+      "body": 6,
+      "small": 6
+    }
+  },
+  "nodes": [
+    {
+      "id": "it",
+      "shape": "parallelogram",
+      "label": "Image t",
+      "role": "input",
+      "position": {
+        "x": 39,
+        "y": 55
+      }
+    },
+    {
+      "id": "ctx",
+      "shape": "round",
+      "label": "Context Encoder\n(updated)",
+      "role": "primary",
+      "position": {
+        "x": 168,
+        "y": 55
+      }
+    },
+    {
+      "id": "zt",
+      "shape": "rect",
+      "label": "z(t)",
+      "role": "primary",
+      "position": {
+        "x": 296,
+        "y": 55
+      }
+    },
+    {
+      "id": "pred",
+      "shape": "round",
+      "label": "Predictor\n(updated)",
+      "role": "secondary",
+      "position": {
+        "x": 425,
+        "y": 55
+      }
+    },
+    {
+      "id": "zh",
+      "shape": "rect",
+      "label": "pred",
+      "role": "secondary",
+      "position": {
+        "x": 554,
+        "y": 55
+      }
+    },
+    {
+      "id": "it1",
+      "shape": "parallelogram",
+      "label": "Image t+1",
+      "role": "input",
+      "position": {
+        "x": 39,
+        "y": 185
+      }
+    },
+    {
+      "id": "tgt",
+      "shape": "round",
+      "label": "Target Encoder\n(EMA, frozen)",
+      "role": "accent",
+      "position": {
+        "x": 168,
+        "y": 185
+      }
+    },
+    {
+      "id": "z1",
+      "shape": "rect",
+      "label": "z(t+1)",
+      "role": "accent",
+      "position": {
+        "x": 296,
+        "y": 185
+      }
+    },
+    {
+      "id": "loss",
+      "shape": "rect",
+      "label": "L1 Loss\n(embedding only)",
+      "role": "output",
+      "position": {
+        "x": 694,
+        "y": 120
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "it",
+      "to": "ctx",
+      "kind": "arrow"
+    },
+    {
+      "id": "e2",
+      "from": "ctx",
+      "to": "zt",
+      "kind": "arrow"
+    },
+    {
+      "id": "e3",
+      "from": "zt",
+      "to": "pred",
+      "kind": "arrow"
+    },
+    {
+      "id": "e4",
+      "from": "pred",
+      "to": "zh",
+      "kind": "arrow"
+    },
+    {
+      "id": "e5",
+      "from": "zh",
+      "to": "loss",
+      "kind": "arrow"
+    },
+    {
+      "id": "e6",
+      "from": "it1",
+      "to": "tgt",
+      "kind": "arrow"
+    },
+    {
+      "id": "e7",
+      "from": "tgt",
+      "to": "z1",
+      "kind": "arrow"
+    },
+    {
+      "id": "e8",
+      "from": "z1",
+      "to": "loss",
+      "kind": "dashed",
+      "label": "no grad"
+    }
+  ]
+};
+
+  SciFig.init({ metrics: METRICS, presets: PRESETS });
+
+  var out = SciFig.render(dsl);
+  var svg = out.svg;
+  var report = out.report;
+
+  // 标题
+  document.getElementById('title').textContent = (dsl.meta && dsl.meta.title) || 'SciFig 预览';
+
+  // 画布
+  document.getElementById('stage').innerHTML = svg;
+
+  // lint 报告（只读）
+  var lintEl = document.getElementById('lint');
+  if (report.issues.length === 0) {
+    lintEl.innerHTML = '<div class="ok">无校验问题</div>';
+  } else {
+    var html = '<ul>';
+    report.issues.forEach(function (i) {
+      html += '<li class="' + i.severity + '">[' + i.severity + '] ' + i.rule + ' ' + i.element + '：' + i.message + '</li>';
+    });
+    html += '</ul>';
+    lintEl.innerHTML = html;
+  }
+
+  // DSL 展示
+  document.getElementById('dsl-text').value = JSON.stringify(dsl, null, 2);
+
+  // ---- 通用工具 ----
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 2000);
+  }
+  function copyText(txt) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); toast('已复制到剪贴板'); }
+      catch (e) { toast('复制失败，请手动选择复制'); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () { toast('已复制到剪贴板'); }, fallback);
+    } else fallback();
+  }
+  function download(name, content, type) {
+    var blob = new Blob([content], { type: type });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  function uint8ToBase64(bytes) {
+    var bin = '';
+    var chunk = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(bin);
+  }
+  function svgPhysicalSize(svgStr, dpi) {
+    var wm = svgStr.match(/width="([\d.]+)(mm|in|px)"/);
+    var vb = svgStr.match(/viewBox="[-\d.eE ]+ ([\d.]+) ([\d.]+)"/);
+    var pw;
+    if (wm && wm[2] === 'mm') pw = Math.round(parseFloat(wm[1]) / 25.4 * dpi);
+    else if (wm && wm[2] === 'in') pw = Math.round(parseFloat(wm[1]) * dpi);
+    else if (wm && wm[2] === 'px') pw = Math.round(parseFloat(wm[1]) / 96 * dpi);
+    else if (vb) pw = Math.round(parseFloat(vb[1]) * dpi / 96);
+    else pw = Math.round(8 * dpi);
+    var ph = vb ? Math.round(parseFloat(vb[2]) * pw / parseFloat(vb[1])) : Math.round(pw * 0.75);
+    return { w: pw, h: ph };
+  }
+  function rasterize(svgStr, dpi, cb) {
+    var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function () {
+      var size = svgPhysicalSize(svgStr, dpi);
+      var canvas = document.createElement('canvas');
+      canvas.width = size.w; canvas.height = size.h;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size.w, size.h);
+      ctx.drawImage(img, 0, 0, size.w, size.h);
+      URL.revokeObjectURL(url);
+      cb(canvas, ctx, size);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); toast('SVG 光栅化失败'); };
+    img.src = url;
+  }
+
+  var baseName = ((dsl.meta && dsl.meta.title) || 'figure').replace(/[^\w\u4e00-\u9fa5-]+/g, '_');
+  var svgFull = '<?xml version="1.0" encoding="UTF-8"?>\n' + svg;
+
+  // ---- draw.io 精修 ----
+  function drawioXml() { return SciFig.drawio(out.dsl, out.layout); }
+  function downloadDrawio() { download(baseName + '.drawio', drawioXml(), 'application/xml'); }
+  function openDrawio() {
+    var xml = drawioXml();
+    var encoded = encodeURIComponent(xml);
+    var bytes = new TextEncoder().encode(encoded);
+    if (typeof CompressionStream !== 'function') { downloadDrawio(); toast('浏览器不支持压缩，已改为下载 .drawio'); return; }
+    var cs = new CompressionStream('deflate-raw');
+    var stream = new Blob([bytes]).stream().pipeThrough(cs);
+    new Response(stream).arrayBuffer().then(function (ab) {
+      var b64 = uint8ToBase64(new Uint8Array(ab));
+      var payload = encodeURIComponent(JSON.stringify({ type: 'xml', compressed: true, data: b64 }));
+      window.open('https://app.diagrams.net/?grid=0&pv=0&border=10&edit=_blank#create=' + payload, '_blank');
+    }, function () { downloadDrawio(); toast('压缩失败，已改为下载 .drawio'); });
+  }
+
+  // ---- 导出 PNG / TIFF ----
+  function getDpi() { return parseInt(document.getElementById('dpi-select').value, 10) || 600; }
+  function exportPNG() {
+    var dpi = getDpi();
+    rasterize(svgFull, dpi, function (canvas) {
+      canvas.toBlob(function (blob) { download(baseName + '.png', blob, 'image/png'); }, 'image/png');
+    });
+  }
+  function exportTIFF() {
+    var dpi = getDpi();
+    rasterize(svgFull, dpi, function (canvas, ctx, size) {
+      var data = ctx.getImageData(0, 0, size.w, size.h).data;
+      var buf = SciTiff.encodeTiff(size.w, size.h, data, { dpi: dpi });
+      download(baseName + '.tif', buf, 'image/tiff');
+    });
+  }
+
+  document.getElementById('btn-drawio').addEventListener('click', openDrawio);
+  document.getElementById('btn-download-drawio').addEventListener('click', downloadDrawio);
+  document.getElementById('btn-copy-svg').addEventListener('click', function () { copyText(svgFull); });
+  document.getElementById('btn-download-svg').addEventListener('click', function () { download(baseName + '.svg', svgFull, 'image/svg+xml'); });
+  document.getElementById('btn-copy-dsl').addEventListener('click', function () { copyText(JSON.stringify(dsl, null, 2)); });
+  document.getElementById('btn-png').addEventListener('click', exportPNG);
+  document.getElementById('btn-tiff').addEventListener('click', exportTIFF);
+})();
+</script>
+</body>
+</html>

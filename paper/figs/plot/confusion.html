@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SciPlot 预览</title>
+<style>
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #f4f4f4; color: #222; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
+  .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .meta { font-size: 12px; color: #888; margin-bottom: 12px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  button { font: inherit; font-size: 13px; padding: 7px 14px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; color: #222; }
+  button:hover { border-color: #0072B2; color: #0072B2; }
+  button.primary { background: #0072B2; border-color: #0072B2; color: #fff; }
+  button.primary:hover { opacity: .9; color: #fff; }
+  .spacer { flex: 1; }
+  .dpi-label { font-size: 12px; color: #888; display: flex; align-items: center; gap: 4px; }
+  .dpi-label select { font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid #ddd; border-radius: 5px; }
+  .figure { background: #fff; display: flex; justify-content: center; }
+  .figure svg { max-width: 100%; height: auto; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; font-size: 13px; color: #555; }
+  pre { background: #f6f8fa; border-radius: 6px; padding: 12px; font-size: 11px; overflow: auto; }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1f2329; color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1 id="title">SCI 统计图预览</h1>
+    <div class="meta" id="meta"></div>
+    <div class="toolbar">
+      <span class="spacer"></span>
+      <label class="dpi-label">DPI
+        <select id="dpi-select">
+          <option value="300">300</option>
+          <option value="600" selected>600</option>
+          <option value="1200">1200</option>
+        </select>
+      </label>
+      <button class="primary" id="btn-png">导出 PNG</button>
+      <button id="btn-tiff">导出 TIFF</button>
+      <button id="btn-svg">下载 SVG</button>
+    </div>
+    <div class="figure" id="figure"></div>
+    <details>
+      <summary>查看 plot spec（JSON）</summary>
+      <pre id="spec"></pre>
+    </details>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+/* SciTiff：极简 TIFF 编码器（纯 JS，零依赖，Node / 浏览器通用 UMD）
+ *
+ * 输入 RGBA 像素 + 宽高，输出 RGB + PackBits 无损压缩的 TIFF 字节流（little-endian）。
+ * 供 sci-diagram / sci-statchart 的「导出 TIFF」共用——Node 侧用 @resvg/resvg-js 的
+ * render().pixels 喂进来，浏览器侧用 canvas getImageData 喂进来。
+ *
+ * 输出格式：RGB(Photometric=2) + PackBits(Compression=32773) + 分辨率单位 inch，
+ * 是期刊普遍接受的无损 TIFF（Photoshop/ImageMagick/预览均可打开）。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.SciTiff = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // PackBits 压缩（RFC 1951 无关的 TIFF PackBits，按字节行）
+  // run(2..128 相同字节) -> 控制字节 257-n + 1 字节
+  // literal(1..128 不同字节) -> 控制字节 n-1 + n 字节
+  function packBits(src) {
+    var n = src.length;
+    var out = new Uint8Array(n + Math.ceil(n / 128) + 16);
+    var p = 0, i = 0;
+    while (i < n) {
+      var run = 1;
+      while (i + run < n && src[i + run] === src[i] && run < 128) run++;
+      if (run >= 2) {
+        out[p++] = 257 - run;
+        out[p++] = src[i];
+        i += run;
+      } else {
+        var start = i, lit = 0;
+        while (i < n && lit < 128) {
+          if (i + 1 < n && src[i] === src[i + 1]) break;
+          i++; lit++;
+        }
+        out[p++] = lit - 1;
+        for (var k = 0; k < lit; k++) out[p++] = src[start + k];
+      }
+    }
+    return out.slice(0, p);
+  }
+
+  // width, height: 像素尺寸；rgba: Uint8Array，长度 width*height*4，逐像素 R,G,B,A
+  // opts: { dpi: 600 }（写入 XResolution/YResolution）
+  function encodeTiff(width, height, rgba, opts) {
+    opts = opts || {};
+    var dpi = opts.dpi || 600;
+    var px = width * height;
+
+    // RGBA -> RGB（白底合成，避免透明导致 TIFF 出现黑底）
+    var rgb = new Uint8Array(px * 3);
+    for (var i = 0, j = 0; i < px; i++, j += 3) {
+      var r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2], a = rgba[i * 4 + 3];
+      if (a === 255) { rgb[j] = r; rgb[j + 1] = g; rgb[j + 2] = b; }
+      else if (a === 0) { rgb[j] = 255; rgb[j + 1] = 255; rgb[j + 2] = 255; }
+      else {
+        var f = a / 255;
+        rgb[j] = Math.round(r * f + 255 * (1 - f));
+        rgb[j + 1] = Math.round(g * f + 255 * (1 - f));
+        rgb[j + 2] = Math.round(b * f + 255 * (1 - f));
+      }
+    }
+
+    // TIFF PackBits 规范：每一扫描行（row）独立压缩后按序拼接，不得跨行连续压。
+    var rowBytes = width * 3;
+    var packed = [];
+    var packedTotal = 0;
+    for (var y = 0; y < height; y++) {
+      var pr = packBits(rgb.subarray(y * rowBytes, (y + 1) * rowBytes));
+      packed.push(pr);
+      packedTotal += pr.length;
+    }
+
+    var N = 12;                       // IFD 条目数
+    var IFD_START = 8;                // 头 8 字节
+    var IFD_LEN = 2 + N * 12 + 4;     // count + entries + nextIFD = 150
+    var BPS_OFF = IFD_START + IFD_LEN;        // 158：BitsPerSample[8,8,8] 6 字节
+    var XRES_OFF = BPS_OFF + 6;               // 164：XResolution 8 字节
+    var YRES_OFF = XRES_OFF + 8;              // 172：YResolution 8 字节
+    var STRIP_OFF = YRES_OFF + 8;             // 180：像素数据起点
+
+    var total = STRIP_OFF + packedTotal;
+    var buf = new Uint8Array(total);
+    var dv = new DataView(buf.buffer);
+
+    buf[0] = 0x49; buf[1] = 0x49;             // "II" 小端
+    dv.setUint16(2, 42, true);
+    dv.setUint32(4, IFD_START, true);
+
+    dv.setUint16(IFD_START, N, true);
+    var e = IFD_START + 2;
+    function entry(tag, type, count, value) {
+      dv.setUint16(e, tag, true);
+      dv.setUint16(e + 2, type, true);
+      dv.setUint32(e + 4, count, true);
+      if (type === 3 && count === 1) dv.setUint16(e + 8, value, true);  // SHORT 内联
+      else dv.setUint32(e + 8, value, true);                            // LONG 内联 / 偏移
+      e += 12;
+    }
+    entry(256, 4, 1, width);          // ImageWidth
+    entry(257, 4, 1, height);         // ImageLength
+    entry(258, 3, 3, BPS_OFF);        // BitsPerSample = [8,8,8]
+    entry(259, 3, 1, 32773);          // Compression = PackBits
+    entry(262, 3, 1, 2);              // PhotometricInterpretation = RGB
+    entry(273, 4, 1, STRIP_OFF);      // StripOffsets
+    entry(277, 3, 1, 3);              // SamplesPerPixel = 3
+    entry(278, 4, 1, height);         // RowsPerStrip
+    entry(279, 4, 1, packedTotal);    // StripByteCounts
+    entry(282, 5, 1, XRES_OFF);       // XResolution = dpi/1
+    entry(283, 5, 1, YRES_OFF);       // YResolution = dpi/1
+    entry(296, 3, 1, 2);              // ResolutionUnit = inch
+    dv.setUint32(e, 0, true);         // next IFD = 0
+
+    dv.setUint16(BPS_OFF, 8, true);
+    dv.setUint16(BPS_OFF + 2, 8, true);
+    dv.setUint16(BPS_OFF + 4, 8, true);
+    dv.setUint32(XRES_OFF, dpi, true);
+    dv.setUint32(XRES_OFF + 4, 1, true);
+    dv.setUint32(YRES_OFF, dpi, true);
+    dv.setUint32(YRES_OFF + 4, 1, true);
+
+    var off = STRIP_OFF;
+    for (var ri = 0; ri < packed.length; ri++) {
+      buf.set(packed[ri], off);
+      off += packed[ri].length;
+    }
+    return buf;
+  }
+
+  return { encodeTiff: encodeTiff, packBits: packBits };
+});
+
+</script>
+<script>
+(function () {
+  var svgStr = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"90mm\" height=\"66.67mm\" viewBox=\"0 0 340.16 251.97\">\n<desc><![CDATA[{\"schema\":\"sciplot/v2\",\"version\":\"1.2.0\",\"specSha\":\"5889d49824969ab4f8c7d4a20ec0b71717c072b4ac9578288ed7c151ef2b019e\"}]]></desc>\n<title>9 m clearance judgement</title>\n<text x=\"170.08\" y=\"8\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"6pt\" font-weight=\"700\" fill=\"#222222\">9 m clearance judgement</text>\n<line x1=\"47.37\" y1=\"227.8\" x2=\"298.33\" y2=\"227.8\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<line x1=\"110.11\" y1=\"227.8\" x2=\"110.11\" y2=\"231.3\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"110.11\" y=\"237.7\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">Triggered</text>\n<line x1=\"235.59\" y1=\"227.8\" x2=\"235.59\" y2=\"231.3\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"235.59\" y=\"237.7\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">Not triggered</text>\n<line x1=\"47.37\" y1=\"27.2\" x2=\"47.37\" y2=\"227.8\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<line x1=\"43.87\" y1=\"77.35\" x2=\"47.37\" y2=\"77.35\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"40.87\" y=\"80.15\" text-anchor=\"end\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">Below 9 m</text>\n<line x1=\"43.87\" y1=\"177.65\" x2=\"47.37\" y2=\"177.65\" stroke=\"#222222\" stroke-width=\"0.8\"/>\n<text x=\"40.87\" y=\"180.45\" text-anchor=\"end\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">Above 9 m</text>\n<rect data-scifig=\"cell\" data-r=\"0\" data-c=\"0\" x=\"47.37\" y=\"27.2\" width=\"125.48\" height=\"100.3\" fill=\"#3f2b70\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<text x=\"110.11\" y=\"80.15\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#FFFFFF\">375</text>\n<rect data-scifig=\"cell\" data-r=\"0\" data-c=\"1\" x=\"172.85\" y=\"27.2\" width=\"125.48\" height=\"100.3\" fill=\"#430c5b\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<text x=\"235.59\" y=\"80.15\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#FFFFFF\">105</text>\n<rect data-scifig=\"cell\" data-r=\"1\" data-c=\"0\" x=\"47.37\" y=\"127.5\" width=\"125.48\" height=\"100.3\" fill=\"#440154\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<text x=\"110.11\" y=\"180.45\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#FFFFFF\">11</text>\n<rect data-scifig=\"cell\" data-r=\"1\" data-c=\"1\" x=\"172.85\" y=\"127.5\" width=\"125.48\" height=\"100.3\" fill=\"#fde725\" stroke=\"#D5D5D5\" stroke-width=\"0.5\"/>\n<text x=\"235.59\" y=\"180.45\" text-anchor=\"middle\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#111111\">2835</text>\n<rect x=\"306.33\" y=\"27.2\" width=\"8\" height=\"5.52\" fill=\"#440557\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"32.22\" width=\"8\" height=\"5.52\" fill=\"#430d5c\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"37.23\" width=\"8\" height=\"5.52\" fill=\"#421562\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"42.25\" width=\"8\" height=\"5.52\" fill=\"#411d67\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"47.26\" width=\"8\" height=\"5.52\" fill=\"#40256d\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"52.28\" width=\"8\" height=\"5.52\" fill=\"#3f2e72\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"57.29\" width=\"8\" height=\"5.52\" fill=\"#3e3678\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"62.31\" width=\"8\" height=\"5.52\" fill=\"#3d3e7d\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"67.32\" width=\"8\" height=\"5.52\" fill=\"#3c4683\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"72.34\" width=\"8\" height=\"5.52\" fill=\"#3b4e88\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"77.35\" width=\"8\" height=\"5.52\" fill=\"#3a558b\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"82.37\" width=\"8\" height=\"5.52\" fill=\"#375b8b\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"87.38\" width=\"8\" height=\"5.52\" fill=\"#35628b\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"92.4\" width=\"8\" height=\"5.52\" fill=\"#32688b\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"97.41\" width=\"8\" height=\"5.52\" fill=\"#2f6e8b\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"102.43\" width=\"8\" height=\"5.52\" fill=\"#2d758c\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"107.44\" width=\"8\" height=\"5.52\" fill=\"#2a7b8c\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"112.46\" width=\"8\" height=\"5.52\" fill=\"#28818c\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"117.47\" width=\"8\" height=\"5.52\" fill=\"#25888c\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"122.49\" width=\"8\" height=\"5.52\" fill=\"#228e8c\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"127.5\" width=\"8\" height=\"5.52\" fill=\"#24948a\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"132.52\" width=\"8\" height=\"5.52\" fill=\"#2a9986\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"137.53\" width=\"8\" height=\"5.52\" fill=\"#309f82\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"142.55\" width=\"8\" height=\"5.52\" fill=\"#36a57d\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"147.56\" width=\"8\" height=\"5.52\" fill=\"#3caa79\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"152.58\" width=\"8\" height=\"5.52\" fill=\"#43b075\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"157.59\" width=\"8\" height=\"5.52\" fill=\"#49b571\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"162.61\" width=\"8\" height=\"5.52\" fill=\"#4fbb6d\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"167.62\" width=\"8\" height=\"5.52\" fill=\"#55c168\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"172.64\" width=\"8\" height=\"5.52\" fill=\"#5bc664\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"177.65\" width=\"8\" height=\"5.52\" fill=\"#66cb5f\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"182.67\" width=\"8\" height=\"5.52\" fill=\"#76ce59\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"187.68\" width=\"8\" height=\"5.52\" fill=\"#86d153\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"192.7\" width=\"8\" height=\"5.52\" fill=\"#96d44d\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"197.71\" width=\"8\" height=\"5.52\" fill=\"#a6d747\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"202.73\" width=\"8\" height=\"5.52\" fill=\"#b5da40\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"207.74\" width=\"8\" height=\"5.52\" fill=\"#c5dd3a\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"212.76\" width=\"8\" height=\"5.52\" fill=\"#d5e034\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"217.77\" width=\"8\" height=\"5.52\" fill=\"#e5e32e\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"222.79\" width=\"8\" height=\"5.52\" fill=\"#f5e628\" stroke=\"none\"/>\n<rect x=\"306.33\" y=\"27.2\" width=\"8\" height=\"200.6\" fill=\"none\" stroke=\"#222222\" stroke-width=\"0.5\"/>\n<text x=\"317.33\" y=\"231.58\" text-anchor=\"start\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">0</text>\n<text x=\"317.33\" y=\"160.55\" text-anchor=\"start\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">1000</text>\n<text x=\"317.33\" y=\"89.51\" text-anchor=\"start\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">2000</text>\n<text x=\"317.33\" y=\"18.48\" text-anchor=\"start\" font-family=\"Arial, Helvetica, Liberation Sans, sans-serif\" font-size=\"5pt\" fill=\"#222222\">3000</text>\n<metadata data-scifig=\"trace\"><![CDATA[{\"specSha\":\"5889d49824969ab4f8c7d4a20ec0b71717c072b4ac9578288ed7c151ef2b019e\",\"version\":\"1.2.0\",\"schema\":\"sciplot/v2\",\"trace\":[{\"kind\":\"cell\",\"s\":0,\"i\":0,\"vx\":0,\"vy\":0,\"v\":375,\"px\":110.10837007874017,\"py\":77.3504593175853,\"axis\":\"y\"},{\"kind\":\"cell\",\"s\":0,\"i\":1,\"vx\":1,\"vy\":0,\"v\":105,\"px\":235.58644356955386,\"py\":77.3504593175853,\"axis\":\"y\"},{\"kind\":\"cell\",\"s\":0,\"i\":2,\"vx\":0,\"vy\":1,\"v\":11,\"px\":110.10837007874017,\"py\":177.65137795275592,\"axis\":\"y\"},{\"kind\":\"cell\",\"s\":0,\"i\":3,\"vx\":1,\"vy\":1,\"v\":2835,\"px\":235.58644356955386,\"py\":177.65137795275592,\"axis\":\"y\"}]}]]></metadata>\n</svg>";
+  var spec = {
+  "schema": "sciplot/v2",
+  "type": "confusion",
+  "meta": {
+    "title": "9 m clearance judgement",
+    "preset": "elsevier-1"
+  },
+  "data": {
+    "matrix": {
+      "x": [
+        "Triggered",
+        "Not triggered"
+      ],
+      "y": [
+        "Below 9 m",
+        "Above 9 m"
+      ],
+      "values": [
+        [
+          375,
+          105
+        ],
+        [
+          11,
+          2835
+        ]
+      ]
+    },
+    "normalize": "none"
+  },
+  "legend": {
+    "show": false
+  }
+};
+  document.getElementById('figure').innerHTML = svgStr;
+  document.getElementById('title').textContent = (spec.meta && spec.meta.title) || 'SCI 统计图';
+  document.getElementById('meta').textContent =
+    '类型: ' + spec.type + ' · 预设: ' + ((spec.meta && spec.meta.preset) || 'screen');
+  document.getElementById('spec').textContent = JSON.stringify(spec, null, 2);
+
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 2000);
+  }
+  function download(name, content, type) {
+    var blob = new Blob([content], { type: type });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  function svgPhysicalSize(svgStr, dpi) {
+    var wm = svgStr.match(/width="([\d.]+)(mm|in|px)"/);
+    var vb = svgStr.match(/viewBox="[-\d.eE ]+ ([\d.]+) ([\d.]+)"/);
+    var pw;
+    if (wm && wm[2] === 'mm') pw = Math.round(parseFloat(wm[1]) / 25.4 * dpi);
+    else if (wm && wm[2] === 'in') pw = Math.round(parseFloat(wm[1]) * dpi);
+    else if (wm && wm[2] === 'px') pw = Math.round(parseFloat(wm[1]) / 96 * dpi);
+    else if (vb) pw = Math.round(parseFloat(vb[1]) * dpi / 96);
+    else pw = Math.round(8 * dpi);
+    var ph = vb ? Math.round(parseFloat(vb[2]) * pw / parseFloat(vb[1])) : Math.round(pw * 0.75);
+    return { w: pw, h: ph };
+  }
+  function rasterize(svgStr, dpi, cb) {
+    var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function () {
+      var size = svgPhysicalSize(svgStr, dpi);
+      var canvas = document.createElement('canvas');
+      canvas.width = size.w; canvas.height = size.h;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size.w, size.h);
+      ctx.drawImage(img, 0, 0, size.w, size.h);
+      URL.revokeObjectURL(url);
+      cb(canvas, ctx, size);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); toast('SVG 光栅化失败'); };
+    img.src = url;
+  }
+
+  var baseName = ((spec.meta && spec.meta.title) || 'plot').replace(/[^\w\u4e00-\u9fa5-]+/g, '_');
+  var svgFull = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgStr;
+
+  function getDpi() { return parseInt(document.getElementById('dpi-select').value, 10) || 600; }
+  function exportPNG() {
+    var dpi = getDpi();
+    rasterize(svgStr, dpi, function (canvas) {
+      canvas.toBlob(function (blob) { download(baseName + '.png', blob, 'image/png'); }, 'image/png');
+    });
+  }
+  function exportTIFF() {
+    var dpi = getDpi();
+    rasterize(svgStr, dpi, function (canvas, ctx, size) {
+      var data = ctx.getImageData(0, 0, size.w, size.h).data;
+      var buf = SciTiff.encodeTiff(size.w, size.h, data, { dpi: dpi });
+      download(baseName + '.tif', buf, 'image/tiff');
+    });
+  }
+
+  document.getElementById('btn-png').addEventListener('click', exportPNG);
+  document.getElementById('btn-tiff').addEventListener('click', exportTIFF);
+  document.getElementById('btn-svg').addEventListener('click', function () {
+    download(baseName + '.svg', svgFull, 'image/svg+xml');
+  });
+})();
+</script>
+</body>
+</html>

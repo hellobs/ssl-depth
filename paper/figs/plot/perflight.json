@@ -1,0 +1,48 @@
+{
+ "schema": "sciplot/v2",
+ "type": "bar",
+ "meta": {
+  "title": "Per-flight error: four best and four worst",
+  "preset": "elsevier-1-5",
+  "aspect": 1.3
+ },
+ "data": {
+  "labels": [
+   "F1 b11c9",
+   "F2 46bcd",
+   "F3 d7a82",
+   "F4 8c4ef",
+   "F5 28071",
+   "F6 27350",
+   "F7 225f6",
+   "F8 d7858"
+  ],
+  "series": [
+   {
+    "name": "AbsRel",
+    "y": [
+     0.063,
+     0.0671,
+     0.0713,
+     0.0803,
+     0.2412,
+     0.3175,
+     0.3215,
+     0.4166
+    ]
+   }
+  ]
+ },
+ "axes": {
+  "x": {
+   "label": "Flight (F1-F4: lowest error, F5-F8: highest)"
+  },
+  "y": {
+   "label": "AbsRel",
+   "min": 0
+  }
+ },
+ "legend": {
+  "show": false
+ }
+}

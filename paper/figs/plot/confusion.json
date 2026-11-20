@@ -1,0 +1,36 @@
+{
+ "schema": "sciplot/v2",
+ "type": "bar",
+ "meta": {
+  "title": "Two error types at the 9 m criterion",
+  "preset": "elsevier-1-5",
+  "aspect": 1.35
+ },
+ "data": {
+  "labels": [
+   "Missed\n(105 of 480 below 9 m)",
+   "False trigger\n(11 of 2846 above 9 m)"
+  ],
+  "series": [
+   {
+    "name": "Erroneous frames",
+    "y": [
+     105,
+     11
+    ]
+   }
+  ]
+ },
+ "axes": {
+  "x": {
+   "label": "Error type"
+  },
+  "y": {
+   "label": "Frames",
+   "min": 0
+  }
+ },
+ "legend": {
+  "show": false
+ }
+}

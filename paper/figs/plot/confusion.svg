@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140mm" height="103.7mm" viewBox="0 0 529.13 391.95">
+<desc><![CDATA[{"schema":"sciplot/v2","version":"1.2.0","specSha":"c135d53857572588bea1fef03046fafa2d12043e4906f522f551333890934008"}]]></desc>
+<title>Two error types at the 9 m criterion</title>
+<text x="264.57" y="9.33" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" font-weight="700" fill="#222222">Two error types at the 9 m criterion</text>
+<line x1="41.82" y1="352.58" x2="519.13" y2="352.58" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="244.75" x2="519.13" y2="244.75" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="136.91" x2="519.13" y2="136.91" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="29.07" x2="519.13" y2="29.07" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="352.58" x2="519.13" y2="352.58" stroke="#222222" stroke-width="0.8"/>
+<line x1="161.15" y1="352.58" x2="161.15" y2="356.08" stroke="#222222" stroke-width="0.8"/>
+<text x="161.15" y="368.88" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">Missed
+(105 of 480 below 9 m)</text>
+<line x1="399.81" y1="352.58" x2="399.81" y2="356.08" stroke="#222222" stroke-width="0.8"/>
+<text x="399.81" y="368.88" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">False trigger
+(11 of 2846 above 9 m)</text>
+<line x1="41.82" y1="29.07" x2="41.82" y2="352.58" stroke="#222222" stroke-width="0.8"/>
+<line x1="38.32" y1="352.58" x2="41.82" y2="352.58" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="355.38" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0</text>
+<line x1="38.32" y1="244.75" x2="41.82" y2="244.75" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="247.55" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">50</text>
+<line x1="38.32" y1="136.91" x2="41.82" y2="136.91" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="139.71" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">100</text>
+<line x1="38.32" y1="29.07" x2="41.82" y2="29.07" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="31.87" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">150</text>
+<text x="280.48" y="387.28" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222">Error type</text>
+<text x="5.6" y="190.83" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222" transform="rotate(-90 5.6 190.83)">Frames</text>
+<rect data-scifig="series" data-s="0" x="80.96" y="126.12" width="160.38" height="226.46" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="319.62" y="328.86" width="160.38" height="23.72" fill="#0072B2" stroke="none"/>
+<metadata data-scifig="trace"><![CDATA[{"specSha":"c135d53857572588bea1fef03046fafa2d12043e4906f522f551333890934008","version":"1.2.0","schema":"sciplot/v2","trace":[{"kind":"bar","s":0,"i":0,"vx":0,"vy":105,"px":161.15146456692915,"py":126.12196850393701,"axis":"y"},{"kind":"bar","s":0,"i":1,"vx":1,"vy":11,"px":399.80639370078745,"py":328.8597101195684,"axis":"y"}]}]]></metadata>
+</svg>

@@ -1,0 +1,135 @@
+{
+ "schema": "scifig/v1",
+ "meta": {
+  "title": "Fast and slow control loops",
+  "preset": "screen",
+  "direction": "LR",
+  "locale": "en"
+ },
+ "style": {
+  "fontStack": "Arial, Helvetica, Liberation Sans, sans-serif",
+  "palette": "okabe-ito",
+  "fontSize": {
+   "body": 8,
+   "small": 6.5
+  }
+ },
+ "nodes": [
+  {
+   "id": "cam",
+   "shape": "parallelogram",
+   "label": "Camera\nper frame",
+   "role": "input",
+   "position": {
+    "x": 43,
+    "y": 55
+   }
+  },
+  {
+   "id": "fast",
+   "shape": "round",
+   "label": "Fast Loop\nMicroJEPA\n5.76-22.67 ms",
+   "role": "primary",
+   "position": {
+    "x": 191,
+    "y": 55
+   }
+  },
+  {
+   "id": "judge",
+   "shape": "rect",
+   "label": "Clearance Check\n9 m",
+   "role": "secondary",
+   "position": {
+    "x": 355,
+    "y": 55
+   }
+  },
+  {
+   "id": "ctrl",
+   "shape": "rect",
+   "label": "Control\navoid / slow",
+   "role": "secondary",
+   "position": {
+    "x": 511,
+    "y": 55
+   }
+  },
+  {
+   "id": "uav",
+   "shape": "ellipse",
+   "label": "Aircraft",
+   "role": "output",
+   "position": {
+    "x": 663,
+    "y": 55
+   }
+  },
+  {
+   "id": "slow",
+   "shape": "round",
+   "label": "Slow Loop\nLLM planner\nseconds",
+   "role": "accent",
+   "position": {
+    "x": 355,
+    "y": 195
+   }
+  },
+  {
+   "id": "wp",
+   "shape": "rect",
+   "label": "Waypoints",
+   "role": "accent",
+   "position": {
+    "x": 191,
+    "y": 195
+   }
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "from": "cam",
+   "to": "fast",
+   "kind": "arrow"
+  },
+  {
+   "id": "e2",
+   "from": "fast",
+   "to": "judge",
+   "kind": "arrow"
+  },
+  {
+   "id": "e3",
+   "from": "judge",
+   "to": "ctrl",
+   "kind": "arrow"
+  },
+  {
+   "id": "e4",
+   "from": "ctrl",
+   "to": "uav",
+   "kind": "arrow"
+  },
+  {
+   "id": "e5",
+   "from": "uav",
+   "to": "slow",
+   "kind": "dashed",
+   "label": "state"
+  },
+  {
+   "id": "e6",
+   "from": "slow",
+   "to": "wp",
+   "kind": "dashed"
+  },
+  {
+   "id": "e7",
+   "from": "wp",
+   "to": "judge",
+   "kind": "dashed",
+   "label": "goal"
+  }
+ ]
+}

@@ -1,0 +1,119 @@
+{
+ "schema": "scifig/v1",
+ "meta": {
+  "title": "Residual block (ResNet18 basic block)",
+  "preset": "screen",
+  "direction": "LR",
+  "locale": "en"
+ },
+ "style": {
+  "fontStack": "Arial, Helvetica, Liberation Sans, sans-serif",
+  "palette": "okabe-ito",
+  "fontSize": {
+   "body": 8,
+   "small": 6.5
+  }
+ },
+ "nodes": [
+  {
+   "id": "x",
+   "shape": "circle",
+   "label": "x",
+   "role": "input"
+  },
+  {
+   "id": "c1",
+   "shape": "rect",
+   "label": "Conv 3x3",
+   "role": "primary"
+  },
+  {
+   "id": "b1",
+   "shape": "rect",
+   "label": "BN + ReLU",
+   "role": "muted"
+  },
+  {
+   "id": "c2",
+   "shape": "rect",
+   "label": "Conv 3x3",
+   "role": "primary"
+  },
+  {
+   "id": "b2",
+   "shape": "rect",
+   "label": "BN",
+   "role": "muted"
+  },
+  {
+   "id": "add",
+   "shape": "circle",
+   "label": "+",
+   "role": "flow"
+  },
+  {
+   "id": "rl",
+   "shape": "rect",
+   "label": "ReLU",
+   "role": "muted"
+  },
+  {
+   "id": "y",
+   "shape": "circle",
+   "label": "y",
+   "role": "output"
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "from": "x",
+   "to": "c1",
+   "kind": "arrow"
+  },
+  {
+   "id": "e2",
+   "from": "c1",
+   "to": "b1",
+   "kind": "arrow"
+  },
+  {
+   "id": "e3",
+   "from": "b1",
+   "to": "c2",
+   "kind": "arrow"
+  },
+  {
+   "id": "e4",
+   "from": "c2",
+   "to": "b2",
+   "kind": "arrow"
+  },
+  {
+   "id": "e5",
+   "from": "b2",
+   "to": "add",
+   "kind": "arrow"
+  },
+  {
+   "id": "e6",
+   "from": "add",
+   "to": "rl",
+   "kind": "arrow"
+  },
+  {
+   "id": "e7",
+   "from": "rl",
+   "to": "y",
+   "kind": "arrow"
+  },
+  {
+   "id": "e8",
+   "from": "x",
+   "to": "add",
+   "kind": "dashed",
+   "label": "identity",
+   "feedback": true
+  }
+ ]
+}

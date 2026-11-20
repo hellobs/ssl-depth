@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="SciFig/1.0.0" version="24.7.17">
+  <diagram id="scifig" name="Page-1">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="800" pageHeight="140" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="9" value="Encoder Layer x 6" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F6FA;strokeColor=#A0A8B8;fontColor=#4A5568;verticalAlign=top;align=left;spacingLeft=6;spacingTop=4;fontStyle=1;fontSize=8;dashed=1;" vertex="1" parent="1"><mxGeometry x="259" y="0" width="411" height="80" as="geometry"/></mxCell>
+        <mxCell id="10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.33;fontSize=8;endArrow=block;" edge="1" parent="1" source="2" target="3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.33;fontSize=8;endArrow=block;" edge="1" parent="1" source="3" target="4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.33;fontSize=8;endArrow=block;" edge="1" parent="1" source="4" target="5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.33;fontSize=8;endArrow=block;" edge="1" parent="1" source="5" target="6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.33;fontSize=8;endArrow=block;" edge="1" parent="1" source="6" target="7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="15" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=1.33;fontSize=8;endArrow=block;" edge="1" parent="1" source="7" target="8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="16" value="residual" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#8A94A6;strokeWidth=1.33;fontSize=8;endArrow=block;dashed=1;" edge="1" parent="1" source="3" target="5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="17" value="residual" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#8A94A6;strokeWidth=1.33;fontSize=8;endArrow=block;dashed=1;" edge="1" parent="1" source="5" target="7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="2" value="Image&lt;br&gt;192x108" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fillColor=#D3ECF9;strokeColor=#56B4E9;fontColor=#111111;strokeWidth=2.13;fontSize=8;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="21" y="28" width="55" height="35" as="geometry"/></mxCell>
+        <mxCell id="3" value="Patch Embed + Pos. Enc.&lt;br&gt;6x6, 576 tokens" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#DBEBF4;strokeColor=#0072B2;fontColor=#111111;strokeWidth=1.33;fontSize=8;" vertex="1" parent="1"><mxGeometry x="116" y="28" width="115" height="35" as="geometry"/></mxCell>
+        <mxCell id="4" value="Multi-Head&lt;br&gt;Attention&lt;br&gt;3 heads" style="rounded=1;arcSize=22;whiteSpace=wrap;html=1;fillColor=#FCF2DB;strokeColor=#E69F00;fontColor=#111111;strokeWidth=1.33;fontSize=8;" vertex="1" parent="1"><mxGeometry x="271" y="23" width="63" height="45" as="geometry"/></mxCell>
+        <mxCell id="5" value="Add &amp; Norm" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EDEDED;strokeColor=#7F7F7F;fontColor=#111111;strokeWidth=1.33;fontSize=8;" vertex="1" parent="1"><mxGeometry x="374" y="33" width="68" height="26" as="geometry"/></mxCell>
+        <mxCell id="6" value="FFN&lt;br&gt;192-768-192" style="rounded=1;arcSize=22;whiteSpace=wrap;html=1;fillColor=#FCF2DB;strokeColor=#E69F00;fontColor=#111111;strokeWidth=1.33;fontSize=8;" vertex="1" parent="1"><mxGeometry x="482" y="28" width="69" height="35" as="geometry"/></mxCell>
+        <mxCell id="7" value="Add &amp; Norm" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EDEDED;strokeColor=#7F7F7F;fontColor=#111111;strokeWidth=1.33;fontSize=8;" vertex="1" parent="1"><mxGeometry x="591" y="33" width="68" height="26" as="geometry"/></mxCell>
+        <mxCell id="8" value="Token Features&lt;br&gt;576x192" style="ellipse;whiteSpace=wrap;html=1;fillColor=#F4D5BD;strokeColor=#D55E00;fontColor=#111111;strokeWidth=2.13;fontSize=8;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="699" y="28" width="80" height="35" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

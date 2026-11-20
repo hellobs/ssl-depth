@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140mm" height="112mm" viewBox="0 0 529.13 423.31">
+<desc><![CDATA[{"schema":"sciplot/v2","version":"1.2.0","specSha":"f723214cab930e9388ccb3a0cc156d92575c155cbeaf3c0493ca347c0cf7bd2a"}]]></desc>
+<title>Depth accuracy by ground-truth distance</title>
+<text x="264.57" y="9.33" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" font-weight="700" fill="#222222">Depth accuracy by ground-truth distance</text>
+<line x1="39.97" y1="383.94" x2="519.13" y2="383.94" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="312.97" x2="519.13" y2="312.97" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="241.99" x2="519.13" y2="241.99" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="171.02" x2="519.13" y2="171.02" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="100.04" x2="519.13" y2="100.04" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="29.07" x2="519.13" y2="29.07" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="39.97" y1="383.94" x2="519.13" y2="383.94" stroke="#222222" stroke-width="0.8"/>
+<line x1="99.86" y1="383.94" x2="99.86" y2="387.44" stroke="#222222" stroke-width="0.8"/>
+<text x="99.86" y="393.84" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0-10 m</text>
+<line x1="219.66" y1="383.94" x2="219.66" y2="387.44" stroke="#222222" stroke-width="0.8"/>
+<text x="219.66" y="393.84" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">10-20 m</text>
+<line x1="339.45" y1="383.94" x2="339.45" y2="387.44" stroke="#222222" stroke-width="0.8"/>
+<text x="339.45" y="393.84" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">20-40 m</text>
+<line x1="459.24" y1="383.94" x2="459.24" y2="387.44" stroke="#222222" stroke-width="0.8"/>
+<text x="459.24" y="393.84" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">40-80 m</text>
+<line x1="39.97" y1="29.07" x2="39.97" y2="383.94" stroke="#222222" stroke-width="0.8"/>
+<line x1="36.47" y1="383.94" x2="39.97" y2="383.94" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="386.74" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0</text>
+<line x1="36.47" y1="312.97" x2="39.97" y2="312.97" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="315.77" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0.2</text>
+<line x1="36.47" y1="241.99" x2="39.97" y2="241.99" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="244.79" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0.4</text>
+<line x1="36.47" y1="171.02" x2="39.97" y2="171.02" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="173.82" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0.6</text>
+<line x1="36.47" y1="100.04" x2="39.97" y2="100.04" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="102.84" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0.8</text>
+<line x1="36.47" y1="29.07" x2="39.97" y2="29.07" stroke="#222222" stroke-width="0.8"/>
+<text x="33.47" y="31.87" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">1</text>
+<text x="279.55" y="418.64" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222">Ground-truth distance</text>
+<text x="5.6" y="206.5" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222" transform="rotate(-90 5.6 206.5)">d1 (within 1.25x)</text>
+<rect data-scifig="series" data-s="0" x="59.61" y="124.14" width="80.5" height="259.8" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="179.41" y="75.24" width="80.5" height="308.7" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="299.2" y="72.36" width="80.5" height="311.58" fill="#0072B2" stroke="none"/>
+<rect data-scifig="series" data-s="0" x="418.99" y="72.22" width="80.5" height="311.72" fill="#0072B2" stroke="none"/>
+<metadata data-scifig="trace"><![CDATA[{"specSha":"f723214cab930e9388ccb3a0cc156d92575c155cbeaf3c0493ca347c0cf7bd2a","version":"1.2.0","schema":"sciplot/v2","trace":[{"kind":"bar","s":0,"i":0,"vx":0,"vy":0.7321,"px":99.86373228346457,"py":124.13734517060368,"axis":"y"},{"kind":"bar","s":0,"i":1,"vx":1,"vy":0.8699,"px":219.65519685039374,"py":75.23574196850393,"axis":"y"},{"kind":"bar","s":0,"i":2,"vx":2,"vy":0.878,"px":339.44666141732284,"py":72.36126456692915,"axis":"y"},{"kind":"bar","s":0,"i":3,"vx":3,"vy":0.8784,"px":459.238125984252,"py":72.2193150656168,"axis":"y"}]}]]></metadata>
+</svg>

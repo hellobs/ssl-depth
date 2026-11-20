@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140mm" height="107.69mm" viewBox="0 0 529.13 407.03">
+<desc><![CDATA[{"schema":"sciplot/v2","version":"1.2.0","specSha":"0a84728bff9f6f97d4e8a97e484b1b68b7de0f418c511d28942a535582fc7b18"}]]></desc>
+<title>Threshold sweep: recall and false triggers</title>
+<text x="264.57" y="9.33" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" font-weight="700" fill="#222222">Threshold sweep: recall and false triggers</text>
+<line x1="41.82" y1="367.66" x2="481.02" y2="367.66" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="304.15" x2="481.02" y2="304.15" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="240.65" x2="481.02" y2="240.65" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="177.14" x2="481.02" y2="177.14" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="113.64" x2="481.02" y2="113.64" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="50.13" x2="481.02" y2="50.13" stroke="#D5D5D5" stroke-width="0.5"/>
+<line x1="41.82" y1="367.66" x2="481.02" y2="367.66" stroke="#222222" stroke-width="0.8"/>
+<line x1="41.82" y1="367.66" x2="41.82" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="41.82" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">5</text>
+<line x1="188.22" y1="367.66" x2="188.22" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="188.22" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">10</text>
+<line x1="334.62" y1="367.66" x2="334.62" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="334.62" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">15</text>
+<line x1="481.02" y1="367.66" x2="481.02" y2="371.16" stroke="#222222" stroke-width="0.8"/>
+<text x="481.02" y="377.56" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">20</text>
+<line x1="41.82" y1="50.13" x2="41.82" y2="367.66" stroke="#222222" stroke-width="0.8"/>
+<line x1="38.32" y1="367.66" x2="41.82" y2="367.66" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="370.46" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">50</text>
+<line x1="38.32" y1="304.15" x2="41.82" y2="304.15" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="306.95" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">60</text>
+<line x1="38.32" y1="240.65" x2="41.82" y2="240.65" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="243.45" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">70</text>
+<line x1="38.32" y1="177.14" x2="41.82" y2="177.14" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="179.94" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">80</text>
+<line x1="38.32" y1="113.64" x2="41.82" y2="113.64" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="116.44" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">90</text>
+<line x1="38.32" y1="50.13" x2="41.82" y2="50.13" stroke="#222222" stroke-width="0.8"/>
+<text x="35.32" y="52.93" text-anchor="end" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">100</text>
+<line x1="481.02" y1="50.13" x2="481.02" y2="367.66" stroke="#222222" stroke-width="0.8"/>
+<line x1="481.02" y1="367.66" x2="484.52" y2="367.66" stroke="#222222" stroke-width="0.8"/>
+<text x="487.52" y="370.46" text-anchor="start" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">0</text>
+<line x1="481.02" y1="304.15" x2="484.52" y2="304.15" stroke="#222222" stroke-width="0.8"/>
+<text x="487.52" y="306.95" text-anchor="start" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">10</text>
+<line x1="481.02" y1="240.65" x2="484.52" y2="240.65" stroke="#222222" stroke-width="0.8"/>
+<text x="487.52" y="243.45" text-anchor="start" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">20</text>
+<line x1="481.02" y1="177.14" x2="484.52" y2="177.14" stroke="#222222" stroke-width="0.8"/>
+<text x="487.52" y="179.94" text-anchor="start" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">30</text>
+<line x1="481.02" y1="113.64" x2="484.52" y2="113.64" stroke="#222222" stroke-width="0.8"/>
+<text x="487.52" y="116.44" text-anchor="start" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">40</text>
+<line x1="481.02" y1="50.13" x2="484.52" y2="50.13" stroke="#222222" stroke-width="0.8"/>
+<text x="487.52" y="52.93" text-anchor="start" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="5pt" fill="#222222">50</text>
+<text x="524.47" y="208.9" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222" transform="rotate(90 524.47 208.9)">False triggers (frames)</text>
+<text x="261.42" y="402.36" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222">Clearance threshold (m)</text>
+<text x="5.6" y="208.9" text-anchor="middle" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222" transform="rotate(-90 5.6 208.9)">Recall (%)</text>
+<polyline data-scifig="series" data-s="0" points="71.1,256.53 158.94,189.21 246.78,69.18 334.62,56.48 481.02,75.54" fill="none" stroke="#0072B2" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="71.1" cy="256.53" r="1.6" fill="#0072B2" stroke="none"/>
+<circle cx="158.94" cy="189.21" r="1.6" fill="#0072B2" stroke="none"/>
+<circle cx="246.78" cy="69.18" r="1.6" fill="#0072B2" stroke="none"/>
+<circle cx="334.62" cy="56.48" r="1.6" fill="#0072B2" stroke="none"/>
+<circle cx="481.02" cy="75.54" r="1.6" fill="#0072B2" stroke="none"/>
+<polyline data-scifig="series" data-s="1" points="71.1,316.86 158.94,297.8 246.78,329.56 334.62,113.64 481.02,94.59" fill="none" stroke="#E69F00" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="71.1" cy="316.86" r="1.6" fill="#E69F00" stroke="none"/>
+<circle cx="158.94" cy="297.8" r="1.6" fill="#E69F00" stroke="none"/>
+<circle cx="246.78" cy="329.56" r="1.6" fill="#E69F00" stroke="none"/>
+<circle cx="334.62" cy="113.64" r="1.6" fill="#E69F00" stroke="none"/>
+<circle cx="481.02" cy="94.59" r="1.6" fill="#E69F00" stroke="none"/>
+<line x1="191.77" y1="35.6" x2="205.77" y2="35.6" stroke="#0072B2" stroke-width="0.8"/>
+<circle cx="198.77" cy="35.6" r="1.6" fill="#0072B2"/>
+<text x="207.77" y="38.6" text-anchor="start" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222">Recall (%)</text>
+<line x1="264.82" y1="35.6" x2="278.82" y2="35.6" stroke="#E69F00" stroke-width="0.8"/>
+<circle cx="271.82" cy="35.6" r="1.6" fill="#E69F00"/>
+<text x="280.82" y="38.6" text-anchor="start" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="7pt" fill="#222222">False triggers</text>
+<metadata data-scifig="trace"><![CDATA[{"specSha":"0a84728bff9f6f97d4e8a97e484b1b68b7de0f418c511d28942a535582fc7b18","version":"1.2.0","schema":"sciplot/v2","trace":[{"kind":"point","s":0,"i":0,"vx":6,"vy":67.5,"px":71.1035905511811,"py":256.5252624671916,"axis":"y"},{"kind":"point","s":0,"i":1,"vx":9,"vy":78.1,"px":158.94236220472442,"py":189.20974096507175,"axis":"y"},{"kind":"point","s":0,"i":2,"vx":12,"vy":97,"px":246.78113385826776,"py":69.18489602261258,"axis":"y"},{"kind":"point","s":0,"i":3,"vx":15,"vy":99,"px":334.61990551181106,"py":56.48385422975974,"axis":"y"},{"kind":"point","s":0,"i":4,"vx":20,"vy":96,"px":481.01785826771663,"py":75.53541691903894,"axis":"y"},{"kind":"point","s":1,"i":0,"vx":6,"vy":8,"px":71.1035905511811,"py":316.8552109832425,"axis":"y2"},{"kind":"point","s":1,"i":1,"vx":9,"vy":11,"px":158.94236220472442,"py":297.8036482939633,"axis":"y2"},{"kind":"point","s":1,"i":2,"vx":12,"vy":6,"px":246.78113385826776,"py":329.55625277609533,"axis":"y2"},{"kind":"point","s":1,"i":3,"vx":15,"vy":40,"px":334.61990551181106,"py":113.63854229759741,"axis":"y2"},{"kind":"point","s":1,"i":4,"vx":20,"vy":43,"px":481.01785826771663,"py":94.58697960831819,"axis":"y2"}]}]]></metadata>
+</svg>

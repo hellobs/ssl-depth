@@ -1,0 +1,129 @@
+{
+ "schema": "scifig/v1",
+ "meta": {
+  "title": "Vision Transformer encoder used in MicroJEPA",
+  "preset": "screen",
+  "direction": "LR",
+  "locale": "en"
+ },
+ "style": {
+  "fontStack": "Arial, Helvetica, Liberation Sans, sans-serif",
+  "palette": "okabe-ito",
+  "fontSize": {
+   "body": 8,
+   "small": 6.5
+  }
+ },
+ "nodes": [
+  {
+   "id": "img",
+   "shape": "parallelogram",
+   "label": "Image\n192x108",
+   "role": "input"
+  },
+  {
+   "id": "patch",
+   "shape": "rect",
+   "label": "Patch Embed + Pos. Enc.\n6x6, 576 tokens",
+   "role": "primary"
+  },
+  {
+   "id": "mha",
+   "shape": "round",
+   "label": "Multi-Head\nAttention\n3 heads",
+   "role": "secondary"
+  },
+  {
+   "id": "an1",
+   "shape": "rect",
+   "label": "Add & Norm",
+   "role": "muted"
+  },
+  {
+   "id": "ffn",
+   "shape": "round",
+   "label": "FFN\n192-768-192",
+   "role": "secondary"
+  },
+  {
+   "id": "an2",
+   "shape": "rect",
+   "label": "Add & Norm",
+   "role": "muted"
+  },
+  {
+   "id": "out",
+   "shape": "ellipse",
+   "label": "Token Features\n576x192",
+   "role": "output"
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "from": "img",
+   "to": "patch",
+   "kind": "arrow"
+  },
+  {
+   "id": "e3",
+   "from": "patch",
+   "to": "mha",
+   "kind": "arrow"
+  },
+  {
+   "id": "e4",
+   "from": "mha",
+   "to": "an1",
+   "kind": "arrow"
+  },
+  {
+   "id": "e5",
+   "from": "an1",
+   "to": "ffn",
+   "kind": "arrow"
+  },
+  {
+   "id": "e6",
+   "from": "ffn",
+   "to": "an2",
+   "kind": "arrow"
+  },
+  {
+   "id": "e7",
+   "from": "an2",
+   "to": "out",
+   "kind": "arrow"
+  },
+  {
+   "id": "r1",
+   "from": "patch",
+   "to": "an1",
+   "kind": "dashed",
+   "label": "residual",
+   "feedback": true
+  },
+  {
+   "id": "r2",
+   "from": "an1",
+   "to": "an2",
+   "kind": "dashed",
+   "label": "residual",
+   "feedback": true
+  }
+ ],
+ "groups": [
+  {
+   "id": "blk",
+   "members": [
+    "mha",
+    "an1",
+    "ffn",
+    "an2"
+   ],
+   "label": "Encoder Layer x 6",
+   "style": "dashed",
+   "padding": 12
+  }
+ ]
+}
