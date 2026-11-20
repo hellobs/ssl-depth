@@ -40,8 +40,8 @@ OUT_REPORT = ROOT / "cache" / "loop_labels_report.json"
 
 ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
          Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
-         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/near_out"),
-         Path("D:/zzr/near_out2")]
+         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/wmdata/near_out"),
+         Path("D:/zzr/wmdata/near_out2")]
 
 POSITIVE = {"accept"}          # 人认为这次触发成立
 NEGATIVE = {"reject"}          # 人认为不该触发

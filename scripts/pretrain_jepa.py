@@ -34,13 +34,13 @@ from microwm.models.microwm import MicroJEPA  # noqa: E402
 # 与 diag_backbone.py 同源：六批数据分处不同根目录，按存在性定位。
 ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
          Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
-         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/near_out"),
+         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/wmdata/near_out"),
          Path("D:/zzr/wmdata/runs_batch5"), Path("D:/zzr/wmdata/runs_batch6"),
          Path("D:/zzr/wmdata/runs_batch7"), Path("D:/zzr/wmdata/runs_b8_newgoal"),
          Path("D:/zzr/wmdata/runs_other_ai"),
          # 2026-11-20 新增：近场补采两轮（near_out3/4）与合作方的三批高空巡航（b11）。
          # 与 v5 的 train/val/test 零重叠，已在加入前逐段核对。
-         Path("D:/zzr/near_out3"), Path("D:/zzr/near_out4"),
+         Path("D:/zzr/wmdata/near_out3"), Path("D:/zzr/wmdata/near_out4"),
          Path("D:/zzr/wmdata/runs_b11_alt20"), Path("D:/zzr/wmdata/runs_b11_alt40"),
          Path("D:/zzr/wmdata/runs_b11_newgoal")]
 OBS = "observations"

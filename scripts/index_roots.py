@@ -30,8 +30,8 @@ BASE = {
     "runs_b8_newgoal": "D:/zzr/wmdata/runs_b8_newgoal",
     "runs_nearfield": "D:/zzr/wmdata/runs_nearfield",
     "runs_other_ai": "D:/zzr/wmdata/runs_other_ai",
-    "near_out": "D:/zzr/near_out",
-    "near_out2": "D:/zzr/near_out2",
+    "near_out": "D:/zzr/wmdata/near_out",
+    "near_out2": "D:/zzr/wmdata/near_out2",
 }
 MIN_VALID, MAX_DEPTH = 0.50, 80.0
 OBS = "observations"

@@ -60,8 +60,8 @@ D:/zzr/wmdata/runs_batch2     13 run / 20 航段 / 3989 帧
 D:/zzr/wmdata/runs_batch3     20 run / 20 航段 / 3151 帧
 D:/zzr/wmdata/runs_batch4     19 run / 19 航段 / 4302 帧
 D:/zzr/wmdata/runs_nearfield  15 run /  1 航段 /  152 帧   ← 14 个 run 是空跑，没有 observations
-D:/zzr/near_out               30 run / 29 航段 / 3590 帧   ← 5 个航段缺 observations
-D:/zzr/near_out2              10 run / 10 航段 / 1422 帧   ← 外部验收集，永不训练
+D:/zzr/wmdata/near_out               30 run / 29 航段 / 3590 帧   ← 5 个航段缺 observations
+D:/zzr/wmdata/near_out2              10 run / 10 航段 / 1422 帧   ← 外部验收集，永不训练
 ```
 
 全部 `run.json` 的 `schema` 都是 `airsim-delivery-m.v1`（M 包采集器）。

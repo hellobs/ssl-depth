@@ -46,7 +46,7 @@ runs/
 
 ## 数据
 
-原始数据不在本仓库，位于本地 `D:/zzr/wmdata/` 下 10 个目录与 `D:/zzr/near_out`、`D:/zzr/near_out2`，共 202 个可用航段。
+原始数据不在本仓库，位于本地 `D:/zzr/wmdata/` 下 10 个目录与 `D:/zzr/wmdata/near_out`、`D:/zzr/wmdata/near_out2`，共 202 个可用航段。
 
 每帧包含前视 RGB、稠密深度图、深度有效掩码。深度由 Unreal Engine 4 的 AirSim 插件直接渲染输出，单位为米，与图像严格对齐。
 
@@ -207,7 +207,7 @@ python scripts/loop_labels.py
 python scripts/loop_lora.py --dry-run
 
 # 真正训练（尚未执行）
-python scripts/loop_lora.py --train --epochs 10 --near-root D:/zzr/near_out2
+python scripts/loop_lora.py --train --epochs 10 --near-root D:/zzr/wmdata/near_out2
 ```
 
 两个设计决定值得说明：
@@ -220,7 +220,7 @@ python scripts/loop_lora.py --train --epochs 10 --near-root D:/zzr/near_out2
 
 铰链把帧级判定翻译成对 ROI 前方距离 p05 的约束：判"该触发"要求 `f ≤ 9−1.5`，判"不该触发"要求 `f ≥ 9+1.5`。`--w-hinge 0` 即纯视差（回答表征问题），`--w-hinge 0.5` 起为决策级目标。
 
-**外部验收集**是 2026-11-18 新采的 10 次近场飞行（`D:/zzr/near_out2`，1422 帧，3 米高度贴楼，前方距离中位 10.8 米），从未参与训练。现有 v4 模型在这个集上的基线：中位误差 −0.02 米、δ1 0.871，但真值 <9 米的 218 帧只召回 31 帧（**14%**）——预测几乎恒定在 11 米附近，失去了近距离的分辨能力。这是闭环需要改进的起点。
+**外部验收集**是 2026-11-18 新采的 10 次近场飞行（`D:/zzr/wmdata/near_out2`，1422 帧，3 米高度贴楼，前方距离中位 10.8 米），从未参与训练。现有 v4 模型在这个集上的基线：中位误差 −0.02 米、δ1 0.871，但真值 <9 米的 218 帧只召回 31 帧（**14%**）——预测几乎恒定在 11 米附近，失去了近距离的分辨能力。这是闭环需要改进的起点。
 
 ## 已知限制
 

@@ -17,7 +17,7 @@ import numpy as np
 
 ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
          Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
-         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/near_out")]
+         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/wmdata/near_out")]
 EXTRA_ROOTS = [Path("D:/zzr/wmdata/runs_batch5"), Path("D:/zzr/wmdata/runs_batch6"),
                Path("D:/zzr/wmdata/runs_batch7"), Path("D:/zzr/wmdata/runs_b8_newgoal"),
                Path("D:/zzr/wmdata/runs_other_ai")]

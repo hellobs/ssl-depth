@@ -40,7 +40,7 @@ ROOTS = [Path(p) for p in [
     "D:/zzr/wmdata/runs", "D:/zzr/wmdata/runs_batch2", "D:/zzr/wmdata/runs_batch3",
     "D:/zzr/wmdata/runs_batch4", "D:/zzr/wmdata/runs_batch5", "D:/zzr/wmdata/runs_batch6",
     "D:/zzr/wmdata/runs_batch7", "D:/zzr/wmdata/runs_b8_newgoal", "D:/zzr/wmdata/runs_nearfield",
-    "D:/zzr/wmdata/runs_other_ai", "D:/zzr/near_out"]]
+    "D:/zzr/wmdata/runs_other_ai", "D:/zzr/wmdata/near_out"]]
 MIN_D, MAX_D = 0.5, 80.0
 
 

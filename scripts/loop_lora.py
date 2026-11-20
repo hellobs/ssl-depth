@@ -319,7 +319,7 @@ def main() -> int:
     ap.add_argument("--near-limit", type=int, default=0)
     ap.add_argument("--near-weight", type=float, default=1.0,
                     help="近场帧在训练里的重复采样次数")
-    ap.add_argument("--eval-root", default="D:/zzr/near_out2")
+    ap.add_argument("--eval-root", default="D:/zzr/wmdata/near_out2")
     ap.add_argument("--eval-limit", type=int, default=256)
     ap.add_argument("--ckpt", default=None, help="本管线训练出的权重")
     ap.add_argument("--backbone-ckpt", default=str(ROOT / "runs/jepa_domain_v5/jepa.pt"),
