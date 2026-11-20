@@ -9,7 +9,7 @@
 |---|---|---|
 | tab:backbone 前四行 | 0.829/0.846/0.208 等 | `runs/v5_{imagenet,resnet_scratch,jepa_domain,scratch}/metrics.json` |
 | tab:backbone JEPA 153 行 | 0.813 / 0.812 / 0.263 | `runs/v5_jepa_domain/metrics.json` |
-| tab:backbone JEPA 240 行 | 0.817 / 0.831 / 0.189 | `runs/v5_jepa_domain_v6/metrics_from_log.json`（日志摘录，见注 1） |
+| tab:backbone JEPA 240 行 | 0.817 / 0.831 / 0.189 | `runs/v5_jepa_domain_v6/metrics.json`（见注 1） |
 | tab:backbone DAv2 行 | 0.862 / 0.886 / 0.198 | `runs/sota_ft_dav2s_{val,test,task_test}.json` |
 | tab:scale 四行 | −0.5 / −10.0 / −12.7 / −0.7 % | `runs/v5_*/task_metric_held.json` 的 pr/gt_median |
 | tab:distance 四行 | 408/1157/1055/706 | `runs/v5_imagenet/error_analysis.json` 的 by_bin |
@@ -18,7 +18,7 @@
 | 延迟数据 | 5.76 / 22.67 ms | 实测，脚本见本文件注 2 |
 | 动作分布 | 贴障 7.4%/0.1% 对空旷 22.8%/13.8% | 由 near_out3/4 与 b11 三批的 transitions.jsonl 统计 |
 
-注 1：v6 的下游训练被中断过一次，重跑完成后脚本未写 features.json，`metrics_from_log.json` 是从 `runs/v6_downstream.log` 提取的 15 轮记录，来源与命令已写在文件内。
+注 1：v6 的下游训练被中断过一次。重跑完成后脚本把 metrics.json 写进了 `runs/runs/v5_jepa_domain_v6/` 这个嵌套路径（路径 bug），已归位到 `runs/v5_jepa_domain_v6/metrics.json`。同目录下的 `metrics_from_log.json` 是当时从训练日志提取的交叉验证记录，与 metrics.json 的 best_val 0.817、test 0.831、AbsRel 0.189 完全一致。
 注 2：延迟测量为 JepaBackbone + DepthHead 各 200 次前向的均值，输入 1×1×3×108×192。
 
 ## 二、论文引用的权重

@@ -1,0 +1,54 @@
+{
+ "model": "depth-anything/Depth-Anything-V2-Small-hf",
+ "finetuned": true,
+ "epochs": 6,
+ "params_m": 24.785089,
+ "pixel": {
+  "n_px": 82455328,
+  "absrel_raw": 0.16235677897930145,
+  "absrel_med": 0.16243088245391846,
+  "d1": 0.8753228293507,
+  "d1_med": 0.8753013389262123,
+  "rmse": 6.249471187591553
+ },
+ "task": {
+  "n_frame": 1671,
+  "gt_median": 17.21875,
+  "pr_median": 17.419668197631836,
+  "t6": {
+   "hit": 67,
+   "miss": 48,
+   "false": 7,
+   "pass": 1549,
+   "recall": 0.5826086956521739
+  },
+  "t9": {
+   "hit": 187,
+   "miss": 58,
+   "false": 9,
+   "pass": 1417,
+   "recall": 0.763265306122449
+  },
+  "t12": {
+   "hit": 725,
+   "miss": 8,
+   "false": 9,
+   "pass": 929,
+   "recall": 0.9890859481582538
+  },
+  "t15": {
+   "hit": 777,
+   "miss": 3,
+   "false": 11,
+   "pass": 880,
+   "recall": 0.9961538461538462
+  },
+  "t20": {
+   "hit": 886,
+   "miss": 41,
+   "false": 17,
+   "pass": 727,
+   "recall": 0.9557713052858684
+  }
+ }
+}

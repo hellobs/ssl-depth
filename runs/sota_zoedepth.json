@@ -1,0 +1,56 @@
+{
+ "model": "Intel/zoedepth-nyu-kitti",
+ "split": "held",
+ "invert": false,
+ "align": "per-image",
+ "affine": null,
+ "pixel": {
+  "n_px": 97310911,
+  "absrel_raw": 0.6238271594047546,
+  "absrel_med": 0.882227897644043,
+  "scale": 0.32643914222717285,
+  "d1": 0.11032845021870158,
+  "d1_med": 0.34392738343596435,
+  "rmse": 27.177108764648438
+ },
+ "task": {
+  "n_frame": 2254,
+  "gt_median": 27.234375,
+  "pr_median": 11.382450580596924,
+  "t6": {
+   "hit": 103,
+   "miss": 13,
+   "false": 434,
+   "pass": 1704,
+   "recall": 0.8879310344827587
+  },
+  "t9": {
+   "hit": 202,
+   "miss": 44,
+   "false": 679,
+   "pass": 1329,
+   "recall": 0.8211382113821138
+  },
+  "t12": {
+   "hit": 466,
+   "miss": 269,
+   "false": 787,
+   "pass": 732,
+   "recall": 0.6340136054421769
+  },
+  "t15": {
+   "hit": 781,
+   "miss": 0,
+   "false": 1040,
+   "pass": 433,
+   "recall": 1.0
+  },
+  "t20": {
+   "hit": 929,
+   "miss": 0,
+   "false": 1306,
+   "pass": 19,
+   "recall": 1.0
+  }
+ }
+}
