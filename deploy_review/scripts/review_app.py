@@ -150,7 +150,7 @@ items = [json.loads(l) for l in QUEUE.read_text(encoding="utf-8").splitlines()]
 IMG_DIR.mkdir(parents=True, exist_ok=True)
 for it in items:
     stem = it["item_id"].split("/")[-1]
-    src = Path(it["image_dir"]) / (stem + "_front_rgb.png")
+    src = Path(os.path.expandvars(it["image_dir"])) / (stem + "_front_rgb.png")
     dst = IMG_DIR / (it["item_id"].replace("/", "_") + ".png")
     if not dst.exists():
         shutil.copy(src, dst)

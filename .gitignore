@@ -65,3 +65,6 @@ runs/pure_train_runs_v4.txt
 # 早期探测用的索引变体
 cache/kept.json
 cache/kept80.json
+
+# 由复核记录生成，含本机路径
+cache/loop_labels.jsonl

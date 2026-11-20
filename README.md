@@ -120,13 +120,11 @@ paper/
   main.pdf               编译产物
   figs/                  配图，结构图与统计图的 spec 在同目录的 dsl/ 与 plot/
 review/
-  review_queue.jsonl     复核队列（110 条）
-  reviews.jsonl          评审记录
+  review_queue.jsonl     复核队列（110 条，图片路径走 $WM_DATA_ROOT）
   imgs/                  队列对应的触发帧
 deploy_review/           原型的部署副本（含 requirements.txt）
 cache/
   kept_all_v5.json       帧索引，当前划分使用
-  loop_labels.jsonl      第三个环节的标签
 runs/
   v5_imagenet/           主表与误差分析的原始输出
   v5_resnet_scratch/
