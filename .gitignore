@@ -42,5 +42,19 @@ _wtest_*.txt
 # 投稿用导出副本（main.pdf 才是构建产物）
 paper/基于人工智能的无人机单目深度测距的误差分析与设计研究.pdf
 
-# LoRA 适配实验（按作者决定未进论文，仅本地留存）
+# 已归档的早期实验目录（本地保留，不入库）
+runs/v2_*/
+runs/v3_*/
+runs/v4_*/
+runs/diag_*/
+runs/_deprecated/
+runs/jepa_domain_clean/
+runs/jepa_domain_v4/
+runs/jepa_domain_v5*/
+runs/v5_jepa_domain/
+runs/v5_jepa_g4/
+runs/v5_jepa_lora/
 runs/jepa_lora_*/
+runs/min3/
+runs/min20_80m/
+runs/*.log
