@@ -21,11 +21,11 @@ import numpy as np
 import torch
 from PIL import Image, ImageDraw, ImageFont
 
-sys.path.insert(0, "D:/zzr/ssl-depth/scripts")
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
 from diag_backbone import CACHE, DepthHead, Frames, ResnetBackbone, split  # noqa: E402
 from task_metric import front_near  # noqa: E402
 
-ROOT = Path("D:/zzr/ssl-depth")
+ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "paper" / "stimuli"
 OUT.mkdir(parents=True, exist_ok=True)
 
