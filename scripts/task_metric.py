@@ -35,6 +35,13 @@ def front_near(depth: np.ndarray) -> float:
 def build(backbone: str, run_dir: str):
     dev = "cuda"
     torch.cuda.set_per_process_memory_fraction(0.4, 0)
+    # 随机初始化的骨干不存权重（head.pt 只有 head 与 proj），必须用训练时的种子重建，
+    # 否则每次跑都是另一份随机权重，指标是噪声。种子记在该目录 metrics.json 的 args.seed。
+    mp = Path(run_dir) / "metrics.json"
+    seed = 0
+    if mp.exists():
+        seed = int(json.loads(mp.read_text(encoding="utf-8")).get("args", {}).get("seed", 0))
+    torch.manual_seed(seed)
     if backbone in ("imagenet", "resnet_scratch"):
         bb = ResnetBackbone(backbone == "imagenet").to(dev)
     else:
@@ -72,12 +79,22 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--split", default="all", choices=["all", "held"],
                     help="all=全量（含训练帧）；held=仅验证+测试")
+    ap.add_argument("--only", default=None,
+                    help="只跑指定骨干（逗号分隔）。随机初始化的骨干不设种子重建会得到"
+                         "与训练时不同的权重，全量重跑会覆盖掉正确结果")
+    ap.add_argument("--index", default=None,
+                    help="帧索引，默认 cache/kept_all.json；v5 用 cache/kept_all_v5.json")
+    ap.add_argument("--split-file", default=None,
+                    help="划分来源，默认 runs/v4_imagenet/metrics.json；v5 用 runs/v5_split.json")
+    ap.add_argument("--only-run", default=None,
+                    help="只跑 run_dir 含该子串的条目，例如 v5_ 或 v4_")
     a = ap.parse_args()
+    only = {x.strip() for x in a.only.split(",")} if a.only else None
 
-    idx = json.loads(CACHE.read_text(encoding="utf-8"))
+    idx = json.loads(Path(a.index or CACHE).read_text(encoding="utf-8"))
     # 必须用训练时记录的划分：索引后来重建过（补采 9 段、清理 3 段），
     # 现算 split() 会与训练划分不一致，导致训练帧漏进留出集。
-    sp = json.loads((ROOT / "runs" / "v4_imagenet" / "metrics.json")
+    sp = json.loads(Path(a.split_file or (ROOT / "runs" / "v4_imagenet" / "metrics.json"))
                     .read_text(encoding="utf-8"))["split"]
     if a.split == "held":
         eps_all = sorted(set(sp["val"]) | set(sp["test"]))
@@ -91,7 +108,17 @@ def main():
                               ("resnet_scratch", "runs/v4_resnet_scratch"),
                               ("jepa", "runs/v4_jepa"),
                               ("jepa_domain", "runs/v4_jepa_domain"),
-                              ("scratch", "runs/v4_scratch")]:
+                              ("scratch", "runs/v4_scratch"),
+                              # v5：训练集扩到全盘的同一批骨干，val/test 不变
+                              ("imagenet", "runs/v5_imagenet"),
+                              ("resnet_scratch", "runs/v5_resnet_scratch"),
+                              ("scratch", "runs/v5_scratch"),
+                              ("jepa_domain_v5", "runs/v5_jepa_domain"),
+                              ("jepa_domain_v5_g4", "runs/v5_jepa_g4")]:
+        if only and backbone not in only:
+            continue
+        if a.only_run and a.only_run not in run_dir:
+            continue
         if not Path(run_dir).exists():
             print("跳过", backbone, "(缺少", run_dir, ")"); continue
         bb, head, dev = build(backbone, run_dir)

@@ -16,22 +16,23 @@ import torch
 import torch.utils.data as tud
 
 sys.path.insert(0, "D:/zzr/ssl-depth/scripts")
-from diag_backbone import CACHE, DepthHead, Frames, JepaBackbone, ResnetBackbone, split  # noqa
+from diag_backbone import (CACHE, CKPTS, DepthHead, Frames, JepaBackbone,  # noqa
+                           ResnetBackbone, load_split)
 
 ROOT = Path("D:/zzr/ssl-depth")
 BINS = [(0, 10), (10, 20), (20, 40), (40, 81)]
 
 
-def build(backbone):
+def build(backbone, run_dir=None, seed=0):
     dev = "cuda"
     torch.cuda.set_per_process_memory_fraction(0.35, 0)
+    torch.manual_seed(seed)   # 随机初始化的骨干必须同种子重建
     if backbone in ("imagenet", "resnet_scratch"):
         bb = ResnetBackbone(backbone == "imagenet").to(dev)
     else:
-        from diag_backbone import CKPTS
         bb = JepaBackbone(None if backbone == "scratch" else CKPTS[backbone]).to(dev)
     head = DepthHead(192).to(dev)
-    sd = torch.load(ROOT / "runs" / ("v4_" + backbone) / "head.pt",
+    sd = torch.load(Path(run_dir or (ROOT / "runs" / ("v4_" + backbone))) / "head.pt",
                     map_location="cpu", weights_only=False)
     head.load_state_dict(sd["head"])
     if "proj" in sd and hasattr(bb, "proj"):
@@ -43,11 +44,14 @@ def build(backbone):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--backbone", default="imagenet")
+    ap.add_argument("--run", default=None, help="结果目录，默认 runs/v4_<backbone>")
+    ap.add_argument("--index", default=None)
+    ap.add_argument("--split-file", default=None)
     a = ap.parse_args()
 
-    bb, head, dev = build(a.backbone)
-    idx = json.loads(CACHE.read_text(encoding="utf-8"))
-    tr, va, te = split(idx, 0)
+    bb, head, dev = build(a.backbone, a.run)
+    idx = json.loads(Path(a.index or CACHE).read_text(encoding="utf-8"))
+    tr, va, te = load_split(idx, Path(a.split_file) if a.split_file else None)
     held = va + te
     ds = Frames(idx, held)
     dl = tud.DataLoader(ds, batch_size=8, num_workers=0)
@@ -117,7 +121,7 @@ def main():
                  r["gt_med"], 100 * r["sky"], r["tex"]))
         out["worst"].append(r)
 
-    p = ROOT / "runs" / ("v4_" + a.backbone) / "error_analysis.json"
+    p = Path(a.run or (ROOT / "runs" / ("v4_" + a.backbone))) / "error_analysis.json"
     p.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     print("\n写入", p)
 

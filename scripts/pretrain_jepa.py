@@ -34,7 +34,15 @@ from microwm.models.microwm import MicroJEPA  # noqa: E402
 # 与 diag_backbone.py 同源：六批数据分处不同根目录，按存在性定位。
 ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
          Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
-         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/near_out")]
+         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/near_out"),
+         Path("D:/zzr/wmdata/runs_batch5"), Path("D:/zzr/wmdata/runs_batch6"),
+         Path("D:/zzr/wmdata/runs_batch7"), Path("D:/zzr/wmdata/runs_b8_newgoal"),
+         Path("D:/zzr/wmdata/runs_other_ai"),
+         # 2026-11-20 新增：近场补采两轮（near_out3/4）与合作方的三批高空巡航（b11）。
+         # 与 v5 的 train/val/test 零重叠，已在加入前逐段核对。
+         Path("D:/zzr/near_out3"), Path("D:/zzr/near_out4"),
+         Path("D:/zzr/wmdata/runs_b11_alt20"), Path("D:/zzr/wmdata/runs_b11_alt40"),
+         Path("D:/zzr/wmdata/runs_b11_newgoal")]
 OBS = "observations"
 
 # 下游 JepaBackbone 的规格（= diag_backbone.JEPA_CFG）。位置编码是定长相加，
@@ -202,6 +210,8 @@ def verify_loadable(ckpt: Path) -> bool:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", default="", help="逗号分隔的 run 名后缀；空表示全部")
+    ap.add_argument("--run-list", type=Path, default=None,
+                    help="从文件读 run 全名（每行一个）；给了就忽略 --runs。v5 语料有 147 个 run，用这个")
     ap.add_argument("--skip-runs", default="", help="排除的 run 名后缀（默认排除测试趟）")
     ap.add_argument("--img-h", type=int, default=DOWNSTREAM["img_h"])
     ap.add_argument("--img-w", type=int, default=DOWNSTREAM["img_w"])
@@ -239,6 +249,9 @@ def main():
               "这份权重加载时会丢掉 pos。" % (tok, want), flush=True)
 
     runs = [s.strip() for s in a.runs.split(",") if s.strip()]
+    if a.run_list is not None:
+        runs = [ln.split("#")[0].strip() for ln in a.run_list.read_text(encoding="utf-8").splitlines()]
+        runs = [s for s in runs if s]
     skip = [s.strip() for s in a.skip_runs.split(",") if s.strip()]
     eps = list_episodes(runs or None, skip or None)
     assert_no_leak(eps)

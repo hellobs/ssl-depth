@@ -34,7 +34,10 @@ sys.path.insert(0, "D:/zzr/microwm/src")
 CACHE = Path("D:/zzr/ssl-depth/cache/kept_all.json")
 ROOTS = [Path("D:/zzr/wmdata/runs"), Path("D:/zzr/wmdata/runs_batch2"),
          Path("D:/zzr/wmdata/runs_batch3"), Path("D:/zzr/wmdata/runs_batch4"),
-         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/near_out")]
+         Path("D:/zzr/wmdata/runs_nearfield"), Path("D:/zzr/near_out"),
+         Path("D:/zzr/wmdata/runs_batch5"), Path("D:/zzr/wmdata/runs_batch6"),
+         Path("D:/zzr/wmdata/runs_batch7"), Path("D:/zzr/wmdata/runs_b8_newgoal"),
+         Path("D:/zzr/wmdata/runs_other_ai")]
 
 
 def find_obs(run: str, episode: str) -> Path:
@@ -58,6 +61,12 @@ MIN_DEPTH = 0.5
 CKPTS = {
     "jepa": Path("D:/zzr/microwm/outputs/base_s6/jepa.pt"),
     "jepa_domain": Path("D:/zzr/ssl-depth/runs/jepa_domain_v4/jepa.pt"),
+    # v5：训练语料扩到全盘 152 航段 / 17,053 帧（v4 是 66 / 8,565），val/test 不变
+    "jepa_domain_v5": Path("D:/zzr/ssl-depth/runs/jepa_domain_v5/jepa.pt"),
+    # v5 + gap 4 + 12000 步：补齐上一版的欠训（4000 步只过 3 遍）
+    "jepa_domain_v5_g4": Path("D:/zzr/ssl-depth/runs/jepa_domain_v5_g4/jepa.pt"),
+    # v6：在 v5 的 153 航段基础上加入 2026-11-19/20 新采的 87 航段（近场两轮 + 合作方三批）
+    "jepa_domain_v6": Path("D:/zzr/ssl-depth/runs/jepa_domain_v6/jepa.pt"),
 }
 
 # 与 jepa.pt 完全一致的模型配置（从 ckpt 里读出来后写死，避免依赖加载顺序）
@@ -70,12 +79,41 @@ JEPA_CFG = {
 
 
 def split(idx: dict, seed: int = 0):
-    """与 train_min.py 完全一致：同样排序、同一种子，保证结果可比。"""
+    """与 train_min.py 完全一致：同样排序、同一种子，保证结果可比。
+
+    ⚠️ 这是「现算」划分，只在没有权威划分时用。索引重建过之后
+    （补采 9 段近场、清理 3 段早期），现算会得到 104 航段的另一套，
+    与 v4 表其余四行（98 航段 = 69/14/15）不可比。主流程请用 load_split()。
+    """
     eps = sorted(idx["kept"])
     random.Random(seed).shuffle(eps)
     n = len(eps)
     a, b = int(round(0.7 * n)), int(round(0.85 * n))
     return eps[:a], eps[a:b], eps[b:]
+
+
+AUTH_SPLIT = Path("D:/zzr/ssl-depth/runs/v4_imagenet/metrics.json")
+
+
+def load_split(idx: dict, split_path: Path | None = None):
+    """唯一权威划分：默认读 runs/v4_imagenet/metrics.json 的 split 字段（98 航段）。
+
+    v4 表的四行结果都是在这套划分上跑的。索引后来删掉 3 个 train 航段，
+    因此按现存航段过滤；val / test 完整，评测口径与其余四行一致。
+
+    v5 用 `--split-file runs/v5_split.json`：训练集扩到 156 航段，val / test 沿用 v4。
+    """
+    p = Path(split_path) if split_path else AUTH_SPLIT
+    sp = json.loads(p.read_text(encoding="utf-8"))["split"]
+    cur = set(idx["kept"])
+    tr = [e for e in sp["train"] if e in cur]
+    va = [e for e in sp["val"] if e in cur]
+    te = [e for e in sp["test"] if e in cur]
+    if len(tr) != len(sp["train"]) or len(va) != len(sp["val"]) or len(te) != len(sp["test"]):
+        print("  [split] 权威划分 %d/%d/%d，按现存索引过滤后 %d/%d/%d"
+              % (len(sp["train"]), len(sp["val"]), len(sp["test"]),
+                 len(tr), len(va), len(te)), flush=True)
+    return tr, va, te
 
 
 class Frames(Dataset):
@@ -245,7 +283,8 @@ def evaluate(bb, head, dl, dev):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--backbone", required=True,
-                    choices=["scratch", "jepa", "jepa_domain", "imagenet", "resnet_scratch"])
+                    choices=["scratch", "jepa", "jepa_domain", "jepa_domain_v5",
+                             "jepa_domain_v5_g4", "jepa_domain_v6", "imagenet", "resnet_scratch"])
     ap.add_argument("--epochs", type=int, default=15)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--workers", type=int, default=4,
@@ -256,14 +295,20 @@ def main():
                     help="cpu 时不碰显卡；训练速度约慢一个数量级")
     ap.add_argument("--label-ratio", type=float, default=1.0,
                     help="训练集保留多少帧，用于标签效率扫描")
+    ap.add_argument("--out-name", default=None,
+                    help="输出目录后缀，默认用骨干名；并行复跑时用来避免互相覆盖")
+    ap.add_argument("--index", default=None,
+                    help="帧索引 json，默认 cache/kept_all.json；v5 用 cache/kept_all_v5.json")
+    ap.add_argument("--split-file", default=None,
+                    help="划分来源，默认 runs/v4_imagenet/metrics.json；v5 用 runs/v5_split.json")
     a = ap.parse_args()
 
     torch.manual_seed(a.seed)
     dev = a.device
     if dev == "cuda":
         torch.cuda.set_per_process_memory_fraction(0.45, 0)   # 有别的任务在跑，留余量
-    idx = json.loads(CACHE.read_text(encoding="utf-8"))
-    tr, va, te = split(idx, 0)
+    idx = json.loads(Path(a.index or CACHE).read_text(encoding="utf-8"))
+    tr, va, te = load_split(idx, Path(a.split_file) if a.split_file else None)
     n_tr = sum(len(idx["kept"][e]) for e in tr)
     print("[%s] train %d 趟 / %d 帧 | val %d / %d | test %d / %d"
           % (a.backbone, len(tr), n_tr, len(va),
@@ -332,7 +377,8 @@ def main():
           % (best["epoch"], tm["absrel_med"], tm["d1"], tm["rmse"],
              tm["spatial_std_m"] or -1), flush=True)
 
-    out = Path("D:/zzr/ssl-depth/runs/v4_%s" % a.backbone)
+    name = a.out_name or ("v4_" + a.backbone)
+    out = Path("D:/zzr/ssl-depth/runs") / name
     out.mkdir(parents=True, exist_ok=True)
     (out / "metrics.json").write_text(json.dumps(
         {"backbone": a.backbone, "args": vars(a), "best_val": best, "test": tm,

@@ -29,7 +29,10 @@ plt.rcParams["savefig.facecolor"] = "white"
 
 ROOT = Path("D:/zzr/ssl-depth")
 OUT = ROOT / "paper" / "figs"
-DATA = ROOT / "runs" / "v4_imagenet"
+# 默认画 v5（论文主表口径）；要重画旧版就 python scripts/plot_figs_v2.py v4_imagenet
+import sys as _sys  # noqa: E402
+_RUN = _sys.argv[1] if len(_sys.argv) > 1 else "v5_imagenet"
+DATA = ROOT / "runs" / _RUN
 TMF = DATA / "task_metric_held.json"   # 留出集任务指标
 OUT.mkdir(parents=True, exist_ok=True)
 

@@ -38,3 +38,6 @@ deploy_review/review/imgs/
 paper/main-2.pdf
 paper/【ykt*.pdf
 _wtest_*.txt
+
+# LoRA 适配实验（按作者决定未进论文，仅本地留存）
+runs/jepa_lora_*/

@@ -1,42 +1,40 @@
 # -*- coding: utf-8 -*-
-"""闭环第三环（二）：LoRA + 帧级铰链约束的微调管线。
+"""闭环第三环：MicroJEPA 的 LoRA 微调管线。
 
-只搭管线，不在这里跑训练。默认动作是 --dry-run：把数据、LoRA 注入、
-前向反向、损失分量全部走一遍，确认接通后退出，不落权重。
+旧版（ResNet 卷积 LoRA）已删除：论文主线转向世界模型，微调对象随之
+换成 MicroJEPA——它正是本文检验的那条域内世界模型路线，LoRA 回答的
+问题是「冻结是不是在亏待它的表征」。
 
 结构
 ----
-    复核记录 ──loop_labels.py──> cache/loop_labels.jsonl
-                                        │
-    近场新数据（可选，只做深度监督）─────┤
-                                        ▼
-              ResNet18（冻结） + LoRA(r, layer3/4) → DepthHead
-                                        │
-                 ┌──────────────────────┴──────────┐
-            掩码视差 L1                   帧级铰链（来自人的判定）
-                                        │
-                                        ▼
-                        外部近场集验收（从不参与训练）
+    本文训练集（17k 帧，视差监督）────────────┐
+    近场新数据（可选，视差监督，加权采样）────┤
+    复核标签（可选，帧级铰链）────────────────┤
+                                              ▼
+        MicroJEPA encoder（冻结） + ViT LoRA(r) → DepthHead(192)
+                                              │
+              掩码视差 L1  +  w_hinge × 帧级铰链（可选）
+                                              ▼
+                    held 集评估（与 tab:backbone 同口径）+ 外部近场集
 
-为什么两种损失并存
-------------------
-掩码视差 L1 是逐像素的，它不知道"这一帧该不该触发"；人的复核只给到帧级，
-没法逐像素用。铰链把帧级判定翻译成对 **ROI 内前方距离 p05** 的约束：
-  人判"该触发" → 要求 f ≤ T - m（别让模型把近处读远）
-  人判"不该触发" → 要求 f ≥ T + m
-两类标签与真值矛盾时（人否掉了真值很近的帧），loop_labels.py 已标 conflict，
-默认权重为 0，可用 --drop-conflict 强制丢弃。
+为什么 LoRA 加在这三个位置
+--------------------------
+MicroJEPA 的 encoder 是 6 层 Block（nn.MultiheadAttention + MLP，dim 192）。
+LoRA 注入每层的 mlp.fc1、mlp.fc2 与 attn.out_proj。MHA 的 in_proj 是单个
+Parameter（不是模块），无法无损旁路，故 QKV 不做 LoRA——fc1/fc2/out_proj
+已覆盖 MLP 与输出投影的主要容量。r=8 时全部 LoRA 约 0.11M 参数。
+
+与 ResnetBackbone 的关键差异：JepaBackbone.forward 用 no_grad 包住 encoder，
+LoRA 参数拿不到梯度；JepaLoRA 重写 forward 去掉 no_grad，冻结参数本身
+requires_grad=False，不浪费计算。
 
 用法
 ----
-  # 只验证管线连通（默认）
-  python scripts/loop_lora.py --dry-run
+  # 纯视差 LoRA（回答表征问题，与 tab:backbone 可比）
+  python scripts/loop_lora.py --train --epochs 8 --w-hinge 0
 
-  # 标签统计看一眼
-  python scripts/loop_lora.py --dry-run --verbose
-
-  # 真正训练（现在不要跑，留给下一步）
-  python scripts/loop_lora.py --train --epochs 10 --near-root D:/zzr/near_out2
+  # 带帧级铰链（决策级目标）
+  python scripts/loop_lora.py --train --epochs 8 --w-hinge 0.5
 
   # 只做外部近场验收
   python scripts/loop_lora.py --eval-only --ckpt runs/loop_xxx/ckpt.pt
@@ -57,27 +55,26 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from diag_backbone import IMG_H, IMG_W, MAX_DEPTH, MIN_DEPTH, DepthHead, ResnetBackbone  # noqa: E402
+from diag_backbone import IMG_H, IMG_W, MAX_DEPTH, MIN_DEPTH, DepthHead, Frames, find_obs  # noqa: E402
+from task_metric import front_near  # noqa: E402
 
 ROOT = Path("D:/zzr/ssl-depth")
 LABELS = ROOT / "cache" / "loop_labels.jsonl"
 
 
 # ---------------------------------------------------------------- LoRA
-class ConvLoRA(nn.Module):
-    """给冻结的卷积加一条低秩旁路：y = W x + scale * B(A x)。"""
+class LinearLoRA(nn.Module):
+    """给冻结的线性层加低秩旁路：y = W x + scale * B(A x)。"""
 
-    def __init__(self, base: nn.Conv2d, r: int = 8, alpha: int = 16):
+    def __init__(self, base: nn.Linear, r: int = 8, alpha: int = 16):
         super().__init__()
-        assert base.groups == 1, "分组卷积不做 LoRA"
         self.base = base
         for p in self.base.parameters():
             p.requires_grad_(False)
         self.r = r
         self.scale = alpha / r
-        self.A = nn.Conv2d(base.in_channels, r, base.kernel_size,
-                           stride=base.stride, padding=base.padding, bias=False)
-        self.B = nn.Conv2d(r, base.out_channels, 1, bias=False)
+        self.A = nn.Linear(base.in_features, r, bias=False)
+        self.B = nn.Linear(r, base.out_features, bias=False)
         nn.init.kaiming_uniform_(self.A.weight, a=5 ** 0.5)
         nn.init.zeros_(self.B.weight)          # 初始为恒等，不扰动预训练表征
 
@@ -85,56 +82,48 @@ class ConvLoRA(nn.Module):
         return self.base(x) + self.scale * self.B(self.A(x))
 
 
-LAYER_INDEX = {"layer1": 4, "layer2": 5, "layer3": 6, "layer4": 7}
+def inject_vit_lora(encoder: nn.Module, r: int = 8, alpha: int = 16) -> int:
+    """把 encoder 每个 Block 的 mlp.fc1/fc2 换成 LoRA，返回替换个数。
 
+    MicroJEPA 的 Block 结构（microwm/models/microwm.py）：
+        norm1 → attn(nn.MultiheadAttention) → norm2 → mlp(nn.Sequential[Linear, GELU, Linear])
 
-def inject_lora(body: nn.Module, targets=("layer3", "layer4"), r: int = 8,
-                alpha: int = 16) -> int:
-    """把 body 里指定 stage 的 Conv2d 换成 ConvLoRA，返回替换个数。
-
-    body 是 nn.Sequential(*list(resnet18.children())[:-2])，子模块按顺序编号：
-    0 conv1 / 1 bn1 / 2 relu / 3 maxpool / 4 layer1 / 5 layer2 / 6 layer3 / 7 layer4。
-    所以 named_modules() 里看不到 "layer3" 这样的名字，得按索引取。
+    注意 attn.out_proj 不注入：nn.MultiheadAttention.forward 内部用
+    `linear(x, self.out_proj.weight, self.out_proj.bias)` 直接取权重，
+    不走模块调用，包装成 LoRA 会因缺少 .weight 报 AttributeError。
+    in_proj 是单个 Parameter，同样无法旁路。每层的容量主要在 MLP
+    （192→768→192，15360 参数/层），只注入 fc1/fc2 是安全的折中。
     """
-    idxs = []
-    for t in targets:
-        t = str(t).strip()
-        if t.isdigit():
-            idxs.append(int(t))
-        elif t in LAYER_INDEX:
-            idxs.append(LAYER_INDEX[t])
-        else:
-            raise ValueError("未知 stage：%s（可用 layer1..layer4 或 0-7）" % t)
     n = 0
-    for i in idxs:
-        stage = body[i]
-        for child_name, child in list(stage.named_children()):
-            if isinstance(child, nn.Conv2d):
-                setattr(stage, child_name, ConvLoRA(child, r, alpha))
-                n += 1
-            else:
-                for sub_name, sub in list(child.named_children()):
-                    if isinstance(sub, nn.Conv2d):
-                        setattr(child, sub_name, ConvLoRA(sub, r, alpha))
-                        n += 1
+    for blk in encoder.blocks:
+        blk.mlp[0] = LinearLoRA(blk.mlp[0], r, alpha)
+        blk.mlp[2] = LinearLoRA(blk.mlp[2], r, alpha)
+        n += 2
     return n
 
 
-class ResnetLoRA(ResnetBackbone):
-    """与 ResnetBackbone 同一套预处理与投影，只是不再用 no_grad 包住 body。"""
+class JepaLoRA(nn.Module):
+    """MicroJEPA encoder + ViT LoRA。forward 不包 no_grad，LoRA 才有梯度。"""
 
-    def __init__(self, r: int = 8, alpha: int = 16, targets=("layer3", "layer4"),
-                 pretrained: bool = True):
-        super().__init__(pretrained)
-        self.n_lora = inject_lora(self.body, targets, r, alpha)
+    def __init__(self, ckpt: str | Path, r: int = 8, alpha: int = 16):
+        super().__init__()
+        from diag_backbone import JepaBackbone
+        base = JepaBackbone(Path(ckpt))
+        self.enc = base.enc
+        self.tok_h, self.tok_w = base.tok_h, base.tok_w
+        self.n_lora = inject_vit_lora(self.enc, r, alpha)
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        self.enc.eval()          # LN 统计一律冻结
+        return self
 
     def forward(self, x):
-        b = x.shape[0]
-        x = x.reshape(b * x.shape[1], *x.shape[2:]) if x.dim() == 5 else x
-        x = (x * 0.5 + 0.5 - self.mean) / self.std
-        f = self.body(x)                       # 关键：不能包 no_grad，否则 A/B 拿不到梯度
-        f = self.proj(f)
-        return f.flatten(2).transpose(1, 2), f.shape[2], f.shape[3]
+        # MicroJEPA 的 Encoder 要 (B, T, C, H, W)；单帧训练传的是 4 维，补一个时间维
+        if x.dim() == 4:
+            x = x.unsqueeze(1)
+        z = self.enc(x)          # [B, 1, N, D]
+        return z[:, 0], self.tok_h, self.tok_w
 
     def trainable(self):
         return [p for p in self.parameters() if p.requires_grad]
@@ -204,6 +193,28 @@ def scan_near(root: Path, limit: int = 0) -> list[tuple[Path, str]]:
     return out
 
 
+class MixedFrames(Dataset):
+    """主训练集 + 近场重复采样。
+
+    必须是模块级类：Windows 的 DataLoader 用 spawn 起 worker，内部类无法 pickle。
+    """
+
+    def __init__(self, base: Dataset, near: Dataset | None, near_weight: float = 1.0):
+        self.base = base
+        self.near = near
+        self.n_near = int(len(near) * near_weight) if near is not None else 0
+
+    def __len__(self):
+        return len(self.base) + self.n_near
+
+    def __getitem__(self, i):
+        if i < len(self.base):
+            rgb, disp, mask = self.base[i]
+            # 补三个占位，与 NearFrames 的输出格式对齐，否则 collate 报长度不等
+            return rgb, disp, mask, torch.tensor(0.0), torch.tensor(-1), ""
+        return self.near[(i - len(self.base)) % max(1, len(self.near))]
+
+
 # ---------------------------------------------------------------- 损失
 def roi_front(depth: torch.Tensor, mask: torch.Tensor, q: float = 0.05) -> torch.Tensor:
     """ROI 内前方距离的 q 分位（与 task_metric.front_near 同口径，可求导）。"""
@@ -265,33 +276,65 @@ def eval_external(bb, head, dl, dev, T: float) -> dict:
     return out
 
 
+@torch.no_grad()
+def eval_held(bb, head, idx: dict, eps: list[str], dev, batch: int = 16) -> dict:
+    """held 集评估：像素级与帧级都与 tab:backbone / tab:task 同口径。"""
+    head.eval(); bb.eval()
+    dl = DataLoader(Frames(idx, eps), batch_size=batch, num_workers=0)
+    ps, gs, fp, fg = [], [], [], []
+    for rgb, disp_gt, mask in dl:
+        tok, th, tw = bb(rgb.to(dev))
+        disp = head(tok, th, tw)
+        pred_d = 1.0 / torch.clamp(disp.squeeze(1), min=1e-3)
+        gt_d = 1.0 / torch.clamp(disp_gt.squeeze(1).to(dev), min=1e-3)
+        m = mask.squeeze(1).to(dev) > 0.5
+        for j in range(pred_d.shape[0]):
+            g = gt_d[j].cpu().numpy(); p = pred_d[j].cpu().numpy(); mm = m[j].cpu().numpy()
+            g = np.where(mm, g, np.nan); p = np.where(mm, p, np.nan)
+            ps.append(p[np.isfinite(p) & (p > 0)]); gs.append(g[np.isfinite(g) & (g > 0)])
+            fp.append(front_near(p)); fg.append(front_near(g))
+    p = np.concatenate(ps); g = np.concatenate(gs)
+    fm = np.array(fp); fg = np.array(fg)
+    res = dict(d1=float((np.maximum(p / g, g / p) < 1.25).mean()),
+               absrel=float(np.mean(np.abs(p - g) / g)),
+               rmse=float(np.sqrt(np.mean((p - g) ** 2))),
+               gt_median=float(np.median(fg)), pr_median=float(np.median(fm)),
+               n_frame=int(fm.size))
+    for t in (6.0, 9.0, 12.0):
+        dg, dp = fg < t, fm < t
+        res["t%d" % int(t)] = dict(
+            hit=int((dg & dp).sum()), miss=int((dg & ~dp).sum()), false=int((~dg & dp).sum()),
+            recall=float((dg & dp).sum() / max(1, (dg & dp).sum() + (dg & ~dp).sum())))
+    return res
+
+
 # ---------------------------------------------------------------- 主流程
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true", default=True)
-    ap.add_argument("--train", action="store_true", help="真正训练（默认不做）")
+    ap.add_argument("--train", action="store_true", help="真正训练（默认 dry-run）")
     ap.add_argument("--eval-only", action="store_true")
     ap.add_argument("--labels", default=str(LABELS))
     ap.add_argument("--near-root", default=None,
                     help="额外近场数据（只做深度监督）；不要与 --eval-root 相同")
     ap.add_argument("--near-limit", type=int, default=0)
+    ap.add_argument("--near-weight", type=float, default=1.0,
+                    help="近场帧在训练里的重复采样次数")
     ap.add_argument("--eval-root", default="D:/zzr/near_out2")
     ap.add_argument("--eval-limit", type=int, default=256)
-    ap.add_argument("--ckpt", default=None,
-                    help="本管线训练出的权重（backbone+head）")
-    ap.add_argument("--head-ckpt", default="D:/zzr/ssl-depth/runs/v4_imagenet/head.pt",
-                    help="既有 v4 解码头（含 proj），用来给出可信的基线")
+    ap.add_argument("--ckpt", default=None, help="本管线训练出的权重")
+    ap.add_argument("--backbone-ckpt", default=str(ROOT / "runs/jepa_domain_v5/jepa.pt"),
+                    help="被 LoRA 的 MicroJEPA 预训练权重")
     ap.add_argument("--threshold", type=float, default=9.0)
     ap.add_argument("--margin", type=float, default=1.5)
-    ap.add_argument("--w-hinge", type=float, default=0.02)
+    ap.add_argument("--w-hinge", type=float, default=0.0,
+                    help="帧级铰链权重；0 = 纯视差（表征问题）")
     ap.add_argument("--lora-r", type=int, default=8)
     ap.add_argument("--lora-alpha", type=int, default=16)
-    ap.add_argument("--targets", default="layer3,layer4")
-    ap.add_argument("--epochs", type=int, default=10)
-    ap.add_argument("--max-steps", type=int, default=0,
-                    help="每轮最多走几步（0=不限），用于冒烟测试")
-    ap.add_argument("--batch", type=int, default=8)
-    ap.add_argument("--lr-lora", type=float, default=1e-4)
+    ap.add_argument("--epochs", type=int, default=8)
+    ap.add_argument("--max-steps", type=int, default=0, help="每轮最多几步（冒烟用）")
+    ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--workers", type=int, default=4, help="DataLoader 进程数；0=单进程（慢）")
+    ap.add_argument("--lr-lora", type=float, default=2e-4)
     ap.add_argument("--lr-head", type=float, default=3e-4)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--verbose", action="store_true")
@@ -300,48 +343,26 @@ def main() -> int:
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     torch.manual_seed(a.seed)
-    targets = tuple(t.strip() for t in a.targets.split(",") if t.strip())
 
-    rows = [json.loads(l) for l in Path(a.labels).read_text(encoding="utf-8").splitlines()
-            if l.strip()]
-    usable = [r for r in rows if r["weight"] > 0]
-    print("标签 %d 条（权重>0 的 %d 条；真值<%.0f m 的 %d 条）"
-          % (len(rows), len(usable), a.threshold,
-             sum(1 for r in rows if r["gt_front"] < a.threshold)))
-    if a.verbose:
-        for r in usable[:8]:
-            print("  %-46s gt %5.2f m  label %s  w %.2f  votes %s"
-                  % (r["item_id"][-46:], r["gt_front"], r["label"], r["weight"], r["votes"]))
+    full = json.loads((ROOT / "cache/kept_all_v5.json").read_text(encoding="utf-8"))
+    sp = json.loads((ROOT / "runs/v5_split.json").read_text(encoding="utf-8"))["split"]
 
-    bb = ResnetLoRA(a.lora_r, a.lora_alpha, targets).to(dev)
+    bb = JepaLoRA(a.backbone_ckpt, a.lora_r, a.lora_alpha).to(dev)
     head = DepthHead(192).to(dev)
-    print("LoRA 注入 %d 个卷积（r=%d, alpha=%d, targets=%s）"
-          % (bb.n_lora, a.lora_r, a.lora_alpha, ",".join(targets)))
-    n_lora = sum(p.numel() for p in bb.body.parameters() if p.requires_grad)
-    n_proj = sum(p.numel() for p in bb.proj.parameters())
+    print("ViT LoRA 注入 %d 个线性层（r=%d, alpha=%d）| 骨干 %s"
+          % (bb.n_lora, a.lora_r, a.lora_alpha, Path(a.backbone_ckpt).name))
+    n_lora = sum(p.numel() for p in bb.parameters() if p.requires_grad)
     n_head = sum(p.numel() for p in head.parameters())
-    n_base = sum(p.numel() for p in bb.body.parameters())
-    print("可训练参数: LoRA %.2fM | proj %.3fM | head %.3fM | 冻结主干 %.2fM（占全模型 %.1f%%）"
-          % (n_lora / 1e6, n_proj / 1e6, n_head / 1e6, n_base / 1e6,
-             100 * (n_lora + n_proj + n_head) / (n_base + n_lora + n_proj + n_head)))
+    n_base = sum(p.numel() for p in bb.parameters())
+    print("可训练: LoRA %.2fM | head %.3fM | 冻结 encoder %.2fM（可训练占 %.1f%%）"
+          % (n_lora / 1e6, n_head / 1e6, n_base / 1e6,
+             100 * (n_lora + n_head) / (n_base + n_lora + n_head)))
 
     if a.ckpt:
         ck = torch.load(a.ckpt, map_location=dev, weights_only=False)
         bb.load_state_dict(ck["backbone"], strict=False)
         head.load_state_dict(ck["head"])
         print("已载入本管线权重 %s" % a.ckpt)
-    elif a.head_ckpt and Path(a.head_ckpt).exists():
-        # v4 的权重是 {head, proj}：proj 是骨干里唯一的可训练层，必须一起载入，
-        # 否则基线的 proj 仍是随机初始化，数字没意义
-        ck = torch.load(a.head_ckpt, map_location=dev, weights_only=False)
-        head.load_state_dict(ck["head"])
-        if "proj" in ck:
-            # head.pt 里的 proj 带 "proj." 前缀（存的是整个骨干的 state_dict 片段）
-            pj = {k.split("proj.", 1)[-1]: v for k, v in ck["proj"].items()}
-            bb.proj.load_state_dict(pj)
-        print("基线权重 %s（head%s）" % (a.head_ckpt, " + proj" if "proj" in ck else ""))
-    else:
-        print("注意：没有载入任何权重，下面的基线是随机初始化，只能看管线是否接通")
 
     # 外部验收集（永远不参与训练）
     eval_root = Path(a.eval_root)
@@ -356,86 +377,105 @@ def main() -> int:
         print("外部近场集不存在：%s" % eval_root)
 
     if a.eval_only:
-        print(json.dumps(eval_external(bb, head, dl_eval, dev, a.threshold),
-                         ensure_ascii=False, indent=1) if dl_eval else "无验收集")
-        return 0
-
-    ds_label = LabelFrames(rows)
-    dl_label = DataLoader(ds_label, batch_size=a.batch, shuffle=True, num_workers=0)
-
-    # ---------------- 试通：一个 batch 的前向反向
-    if not a.train:
-        batch = next(iter(dl_label))
-        rgb, disp_gt, mask, w, lab, ids = batch
-        rgb, disp_gt, mask = rgb.to(dev), disp_gt.to(dev), mask.to(dev)
-        w, lab = w.to(dev), lab.to(dev)
-        t0 = time.time()
-        tok, th, tw = bb(rgb.unsqueeze(1))
-        disp = head(tok, th, tw)
-        l_depth = (torch.abs(disp - disp_gt) * mask).sum() / mask.sum().clamp(min=1.0)
-        depth_p = 1.0 / torch.clamp(disp.squeeze(1), min=1e-3)
-        front = roi_front(depth_p, mask.squeeze(1))
-        l_hinge, n_hinge = hinge_loss(front, lab, w, a.threshold, a.margin)
-        loss = l_depth + a.w_hinge * l_hinge
-        loss.backward()
-        grads = [p.grad for p in bb.body.parameters() if p.requires_grad]
-        g_ok = sum(1 for g in grads if g is not None and torch.isfinite(g).all())
-        print("\n[试通] batch=%d 前向反向 %.2fs" % (rgb.shape[0], time.time() - t0))
-        print("  掩码视差 L1 %.4f | 铰链 %.4f（参与 %d 帧，权重和 %.2f）| 总损失 %.4f"
-              % (float(l_depth.detach()), float(l_hinge.detach()), n_hinge, float(w.detach().sum()), float(loss.detach())))
-        print("  LoRA 梯度: %d/%d 个参数块拿到有限梯度" % (g_ok, len(grads)))
-        print("  ROI 前方距离预测(米): %s"
-              % [round(float(v), 2) for v in front.detach().cpu()])
-        print("  帧级标签: %s" % lab.cpu().numpy().tolist())
+        if not a.ckpt:
+            raise SystemExit("--eval-only 需要 --ckpt")
+        m = eval_held(bb, head, full, sp["val"] + sp["test"], dev)
+        print("held %s" % json.dumps({k: (round(v, 4) if isinstance(v, float) else v)
+                                      for k, v in m.items()}, ensure_ascii=False))
         if dl_eval:
-            m0 = eval_external(bb, head, dl_eval, dev, a.threshold)
-            print("\n[基线] 外部近场集 %d 帧：%s" % (dl_eval.dataset.__len__(),
-                  json.dumps(m0, ensure_ascii=False)))
-        print("\n管线已接通，未保存任何权重（要训练加 --train）。")
+            print("外部近场 %s" % json.dumps(eval_external(bb, head, dl_eval, dev, a.threshold),
+                                             ensure_ascii=False))
         return 0
 
-    # ---------------- 真正训练
+    # 训练数据：主 split 全帧 + 可选近场重复采样
+    ds_train = Frames(full, sp["train"])
     near = []
     if a.near_root:
         near = scan_near(Path(a.near_root), a.near_limit)
-        print("近场补充（仅深度监督）：%d 帧" % len(near))
+        print("近场补充（仅深度监督）：%d 帧 × %.0f 次采样" % (len(near), a.near_weight))
+    near_ds = NearFrames(near) if near else None
+    dl_train = DataLoader(MixedFrames(ds_train, near_ds, a.near_weight),
+                          batch_size=a.batch, shuffle=True, num_workers=a.workers,
+                          drop_last=True, pin_memory=True,
+                          persistent_workers=a.workers > 0)
+    print("训练帧 %d（近场 %d）| 每轮 %d 步" % (
+        len(ds_train) + (int(len(near) * a.near_weight) if near else 0), len(near), len(dl_train)))
+
+    # 复核标签（w_hinge>0 才加载）
+    dl_label = None
+    if a.w_hinge > 0:
+        rows = [json.loads(l) for l in Path(a.labels).read_text(encoding="utf-8").splitlines()
+                if l.strip()]
+        usable = [r for r in rows if r["weight"] > 0]
+        print("复核标签 %d 条（权重>0 的 %d 条）" % (len(rows), len(usable)))
+        dl_label = DataLoader(LabelFrames(rows), batch_size=min(a.batch, max(1, len(rows))),
+                              shuffle=True, num_workers=0, drop_last=True)
+
     opt = torch.optim.AdamW([
-        {"params": [p for p in bb.body.parameters() if p.requires_grad], "lr": a.lr_lora},
-        {"params": list(bb.proj.parameters()), "lr": a.lr_head},
-        {"params": list(head.parameters()), "lr": a.lr_head},
+        {"params": [p for p in bb.parameters() if p.requires_grad], "lr": a.lr_lora},
+        {"params": head.parameters(), "lr": a.lr_head},
     ], weight_decay=0.01)
+    total = a.epochs * len(dl_train)
+    sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, total))
 
     stamp = time.strftime("%Y%m%d_%H%M")
-    outdir = Path(a.out) if a.out else ROOT / "runs" / ("loop_%s" % stamp)
+    outdir = Path(a.out) if a.out else ROOT / "runs" / ("jepa_lora_%s" % stamp)
     outdir.mkdir(parents=True, exist_ok=True)
+
+    t0 = time.time()
+    step = 0
+    lab_iter = iter(dl_label) if dl_label else None
     for ep in range(a.epochs):
         bb.train(); head.train()
         tot = n = 0
-        for rgb, disp_gt, mask, w, lab, _ in dl_label:
+        for rgb, disp_gt, mask, *_ in dl_train:
             rgb, disp_gt, mask = rgb.to(dev), disp_gt.to(dev), mask.to(dev)
-            w, lab = w.to(dev), lab.to(dev)
-            tok, th, tw = bb(rgb.unsqueeze(1))
+            tok, th, tw = bb(rgb)
             disp = head(tok, th, tw)
             l_depth = (torch.abs(disp - disp_gt) * mask).sum() / mask.sum().clamp(min=1.0)
-            front = roi_front(1.0 / torch.clamp(disp.squeeze(1), min=1e-3), mask.squeeze(1))
-            l_hinge, _ = hinge_loss(front, lab, w, a.threshold, a.margin)
-            loss = l_depth + a.w_hinge * l_hinge
-            opt.zero_grad(); loss.backward(); opt.step()
-            tot += float(loss.detach()); n += 1
+            loss = l_depth
+            if dl_label is not None and a.w_hinge > 0:
+                try:
+                    rgb2, disp2, mask2, w2, lab2, _ = next(lab_iter)
+                except StopIteration:
+                    lab_iter = iter(dl_label)
+                    rgb2, disp2, mask2, w2, lab2, _ = next(lab_iter)
+                rgb2, disp2, mask2 = rgb2.to(dev), disp2.to(dev), mask2.to(dev)
+                w2, lab2 = w2.to(dev), lab2.to(dev)
+                tok2, th2, tw2 = bb(rgb2)
+                disp2 = head(tok2, th2, tw2)
+                front = roi_front(1.0 / torch.clamp(disp2.squeeze(1), min=1e-3),
+                                  mask2.squeeze(1))
+                l_h, _ = hinge_loss(front, lab2, w2, a.threshold, a.margin)
+                loss = loss + a.w_hinge * l_h
+            opt.zero_grad(); loss.backward(); opt.step(); sch.step()
+            tot += float(loss.detach()); n += 1; step += 1
             if a.max_steps and n >= a.max_steps:
                 break
-        msg = "epoch %2d/%d loss %.4f" % (ep + 1, a.epochs, tot / max(1, n))
+        msg = "epoch %2d/%d loss %.4f | %.0fs" % (ep + 1, a.epochs, tot / max(1, n), time.time() - t0)
         if dl_eval:
-            msg += " | 外部近场 %s" % json.dumps(
-                eval_external(bb, head, dl_eval, dev, a.threshold), ensure_ascii=False)
+            m = eval_external(bb, head, dl_eval, dev, a.threshold)
+            msg += " | 近场 recall %.2f miss %d false %d" % (m["recall"], m["miss"], m["false_trigger"])
         print(msg, flush=True)
+        if a.max_steps and step >= a.max_steps:
+            break
 
     ckpt = outdir / "ckpt.pt"
     torch.save({"backbone": bb.state_dict(), "head": head.state_dict(),
-                "config": {"lora_r": a.lora_r, "alpha": a.lora_alpha, "targets": targets,
+                "config": {"lora_r": a.lora_r, "alpha": a.lora_alpha,
                            "threshold": a.threshold, "margin": a.margin,
-                           "w_hinge": a.w_hinge}}, ckpt)
+                           "w_hinge": a.w_hinge, "epochs": a.epochs,
+                           "backbone_ckpt": a.backbone_ckpt}}, ckpt)
     print("已保存 %s" % ckpt)
+
+    m = eval_held(bb, head, full, sp["val"] + sp["test"], dev)
+    print("held: d1 %.3f | AbsRel %.3f | RMSE %.1f | 9 米识别 %.1f%% 误刹 %d"
+          % (m["d1"], m["absrel"], m["rmse"], 100 * m["t9"]["recall"], m["t9"]["false"]))
+    if dl_eval:
+        m2 = eval_external(bb, head, dl_eval, dev, a.threshold)
+        print("外部近场: %s" % json.dumps(m2, ensure_ascii=False))
+    json.dump(dict(model="JEPA LoRA", **m), open(outdir / "metrics.json", "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
     return 0
 
 
