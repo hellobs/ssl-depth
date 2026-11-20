@@ -58,3 +58,6 @@ runs/jepa_lora_*/
 runs/min3/
 runs/min20_80m/
 runs/*.log
+runs/DIAG_*.md
+runs/pure_train_runs.txt
+runs/pure_train_runs_v4.txt
