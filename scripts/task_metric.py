@@ -122,7 +122,12 @@ def main():
                               ("resnet_scratch", "runs/v5_resnet_scratch"),
                               ("scratch", "runs/v5_scratch"),
                               ("jepa_domain_v5", "runs/v5_jepa_domain"),
-                              ("jepa_domain_v5_g4", "runs/v5_jepa_g4")]:
+                              ("jepa_domain_v5_g4", "runs/v5_jepa_g4"),
+                              # v7：训练集 375 航段 / 43,271 帧，val/test 与 v5 完全一致
+                              ("imagenet", "runs/v7_imagenet"),
+                              ("resnet_scratch", "runs/v7_resnet_scratch"),
+                              ("scratch", "runs/v7_scratch"),
+                              ("jepa_domain_v7", "runs/v7_jepa_domain_v7")]:
         if only and backbone not in only:
             continue
         if a.only_run and a.only_run not in run_dir:

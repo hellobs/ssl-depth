@@ -45,7 +45,14 @@ ROOTS = [Path(f"{DATA}/runs"), Path(f"{DATA}/runs_batch2"),
          Path(f"{DATA}/runs_nearfield"), Path(f"{DATA}/near_out"),
          Path(f"{DATA}/runs_batch5"), Path(f"{DATA}/runs_batch6"),
          Path(f"{DATA}/runs_batch7"), Path(f"{DATA}/runs_b8_newgoal"),
-         Path(f"{DATA}/runs_other_ai")]
+         Path(f"{DATA}/runs_other_ai"),
+         Path(f"{DATA}/runs_b9_alt20"), Path(f"{DATA}/runs_b9_alt40"),
+         Path(f"{DATA}/runs_b10_alt20"), Path(f"{DATA}/runs_b10_alt40"),
+         Path(f"{DATA}/runs_b11_alt20"), Path(f"{DATA}/runs_b11_alt40"),
+         Path(f"{DATA}/runs_b11_newgoal"), Path(f"{DATA}/runs_b12_explore"),
+         Path(f"{DATA}/runs_b12_goal"), Path(f"{DATA}/runs_near2"),
+         Path(f"{DATA}/near_out2"), Path(f"{DATA}/near_out3"),
+         Path(f"{DATA}/near_out4")]
 
 
 def find_obs(run: str, episode: str) -> Path:
@@ -75,6 +82,8 @@ CKPTS = {
     "jepa_domain_v5_g4": Path(f"{REPO}/runs/jepa_domain_v5_g4/jepa.pt"),
     # v6：在 v5 的 153 航段基础上加入 2026-11-19/20 新采的 87 航段（近场两轮 + 合作方三批）
     "jepa_domain_v6": Path(f"{REPO}/runs/jepa_domain_v6/jepa.pt"),
+    # v7：训练语料 375 航段 / 43,271 帧，val/test 与 v5 完全一致
+    "jepa_domain_v7": Path(f"{REPO}/runs/jepa_domain_v7/jepa.pt"),
 }
 
 # 与 jepa.pt 完全一致的模型配置（从 ckpt 里读出来后写死，避免依赖加载顺序）
@@ -292,7 +301,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--backbone", required=True,
                     choices=["scratch", "jepa", "jepa_domain", "jepa_domain_v5",
-                             "jepa_domain_v5_g4", "jepa_domain_v6", "imagenet", "resnet_scratch"])
+                             "jepa_domain_v5_g4", "jepa_domain_v6", "jepa_domain_v7",
+                             "imagenet", "resnet_scratch"])
     ap.add_argument("--epochs", type=int, default=15)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--workers", type=int, default=4,

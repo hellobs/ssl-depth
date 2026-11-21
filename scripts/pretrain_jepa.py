@@ -220,6 +220,8 @@ def main():
     ap.add_argument("--runs", default="", help="逗号分隔的 run 名后缀；空表示全部")
     ap.add_argument("--run-list", type=Path, default=None,
                     help="从文件读 run 全名（每行一个）；给了就忽略 --runs。v5 语料有 147 个 run，用这个")
+    ap.add_argument("--split-file", type=Path, default=V4_SPLIT,
+                    help="泄漏自检用的划分文件，需含 split.train/val/test")
     ap.add_argument("--skip-runs", default="", help="排除的 run 名后缀（默认排除测试趟）")
     ap.add_argument("--img-h", type=int, default=DOWNSTREAM["img_h"])
     ap.add_argument("--img-w", type=int, default=DOWNSTREAM["img_w"])
@@ -262,7 +264,7 @@ def main():
         runs = [s for s in runs if s]
     skip = [s.strip() for s in a.skip_runs.split(",") if s.strip()]
     eps = list_episodes(runs or None, skip or None)
-    assert_no_leak(eps)
+    assert_no_leak(eps, a.split_file)
     ds = FramePairs(eps, a.img_h, a.img_w, a.limit, a.gap)
     if len(ds) == 0:
         raise SystemExit("没有可用帧对：检查 --runs 与数据目录")

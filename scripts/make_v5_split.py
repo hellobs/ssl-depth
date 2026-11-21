@@ -22,6 +22,7 @@ DATA = str(_Path(_os.environ.get("WM_DATA_ROOT", _Path(__file__).resolve().paren
 MICROW = str(_Path(_os.environ.get("WM_CODE_ROOT", _Path(__file__).resolve().parents[2] / "microwm")))
 # ---
 
+import argparse
 import json
 from pathlib import Path
 
@@ -34,7 +35,14 @@ OUT_RUNS = ROOT / "runs/pure_train_runs_v5.txt"
 
 
 def main() -> None:
-    idx = json.loads(IDX.read_text(encoding="utf-8"))["kept"]
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--index", type=Path, default=IDX)
+    ap.add_argument("--out-split", type=Path, default=OUT_SPLIT)
+    ap.add_argument("--out-runs", type=Path, default=OUT_RUNS)
+    ap.add_argument("--tag", default="v5")
+    a = ap.parse_args()
+
+    idx = json.loads(a.index.read_text(encoding="utf-8"))["kept"]
     v4 = json.loads(V4.read_text(encoding="utf-8"))["split"]
 
     val = [e for e in v4["val"] if e in idx]
@@ -57,17 +65,17 @@ def main() -> None:
     assert not (set(train) & (set(val) | set(test))), "训练集与留出集重叠"
 
     runs = sorted({e.split("/")[0] for e in train})
-    OUT_SPLIT.write_text(json.dumps(
+    a.out_split.write_text(json.dumps(
         {"split": {"train": train, "val": val, "test": test},
-         "note": "v5：训练集扩到全盘可用航段；val/test 沿用 v4 的 14/15，评测口径不变"},
+         "note": "%s：训练集扩到全盘可用航段；val/test 沿用 v4 的 14/15，评测口径不变" % a.tag},
         ensure_ascii=False, indent=1), encoding="utf-8")
-    OUT_RUNS.write_text("\n".join(runs) + "\n", encoding="utf-8")
+    a.out_runs.write_text("\n".join(runs) + "\n", encoding="utf-8")
 
     def nf(eps):
         return sum(len(idx[e]) for e in eps)
-    print("v5 划分：train %d 航段 / %d 帧 | val %d / %d | test %d / %d"
-          % (len(train), nf(train), n_val, nf(val), n_test, nf(test)))
-    print("训练 run 数 %d -> %s" % (len(runs), OUT_RUNS.name))
+    print("%s 划分：train %d 航段 / %d 帧 | val %d / %d | test %d / %d"
+          % (a.tag, len(train), nf(train), n_val, nf(val), n_test, nf(test)))
+    print("训练 run 数 %d -> %s" % (len(runs), a.out_runs.name))
     print("run 级排除：val/test 涉及 %d 个 run，held_out %d 个 run"
           % (len(blocked), len(held_runs)))
 

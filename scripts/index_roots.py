@@ -36,10 +36,22 @@ BASE = {
     "runs_batch6": f"{DATA}/runs_batch6",
     "runs_batch7": f"{DATA}/runs_batch7",
     "runs_b8_newgoal": f"{DATA}/runs_b8_newgoal",
+    "runs_b9_alt20": f"{DATA}/runs_b9_alt20",
+    "runs_b9_alt40": f"{DATA}/runs_b9_alt40",
+    "runs_b10_alt20": f"{DATA}/runs_b10_alt20",
+    "runs_b10_alt40": f"{DATA}/runs_b10_alt40",
+    "runs_b11_alt20": f"{DATA}/runs_b11_alt20",
+    "runs_b11_alt40": f"{DATA}/runs_b11_alt40",
+    "runs_b11_newgoal": f"{DATA}/runs_b11_newgoal",
+    "runs_b12_explore": f"{DATA}/runs_b12_explore",
+    "runs_b12_goal": f"{DATA}/runs_b12_goal",
     "runs_nearfield": f"{DATA}/runs_nearfield",
+    "runs_near2": f"{DATA}/runs_near2",
     "runs_other_ai": f"{DATA}/runs_other_ai",
     "near_out": f"{DATA}/near_out",
     "near_out2": f"{DATA}/near_out2",
+    "near_out3": f"{DATA}/near_out3",
+    "near_out4": f"{DATA}/near_out4",
 }
 MIN_VALID, MAX_DEPTH = 0.50, 80.0
 OBS = "observations"
