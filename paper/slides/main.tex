@@ -107,7 +107,7 @@
 \vspace{0.15cm}
 40 米以外的远景与大面积天空被剔除，数据在近场偏薄。这一构成会影响后面的误差分布。
 
-\src{AirSim（Shah et al., 2018）；数据与划分见本文第 6.1 节}
+\src{Shah et al., 2018（AirSim）}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -131,19 +131,19 @@
 \begin{frame}{残差网络}
 
 \begin{itemize}
-    \item 层数增加并不必然更好。二十层之后继续加深，训练误差反而上升
+    \item 层数增加并不必然更好，二十层之后继续加深，训练误差反而上升
     \item 原因不是过拟合，而是梯度逐层回传时被反复相乘，越传越小，前面几层收不到更新
-    \item 残差块把输入直接加到输出上，反向传播有一条不经过卷积的短路
-    \item 网络要学的从完整映射变成输入与输出的差值，差值通常更小、更容易学
+    \item 残差块把输入直接加到输出上，反向传播有一条不经过卷积的短路，网络只需学输入与输出的差值
 \end{itemize}
 
-\vspace{0.2cm}
-本文用 ResNet18：四个阶段，每阶段 2 个残差块，通道依次 64、128、256、512，输入 192$\times$108 降到 4$\times$6。
-
 \vspace{0.15cm}
-权重随机初始化，不加载任何预训练。它的作用是提供一组未经训练但结构完整的卷积特征。
+\begin{center}
+\includegraphics[width=0.92\textwidth]{pic/resblock.png}
 
-\src{ResNet（He et al., 2016）}
+{\scriptsize 残差块结构。本文用 ResNet18，四个阶段共 8 个残差块，权重随机初始化。}
+\end{center}
+
+\src{He et al., 2016（ResNet）}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -169,16 +169,19 @@
 \begin{frame}{世界模型与联合嵌入预测}
 
 \begin{itemize}
-    \item LeCun 的主张：智能体不在像素层面预测未来，而在抽象表征空间预测世界的下一步
-    \item JEPA 只用相邻帧：给定当前帧与动作，预测下一帧的表征，不还原像素
-    \item 目标表征由教师编码器给出，教师不做梯度更新，只跟随学生做指数滑动平均，避免表征塌成常数
-    \item 编码器是视觉 Transformer：把图切成 6$\times$6 的小块得到 576 个 token，自注意力让每个块与所有块计算相关性，第一层就看到全图
+    \item LeCun 的主张：不在像素层面预测未来，而在表征空间预测世界的下一步
+    \item JEPA 只用相邻帧，预测下一帧的表征，不还原像素；目标由教师编码器给出，教师只做指数滑动平均，避免表征塌成常数
+    \item 编码器是视觉 Transformer，把图切成 6$\times$6 的小块共 576 个 token，自注意力一次看到全图
 \end{itemize}
 
-\vspace{0.2cm}
-本文的 JEPA 编码器 6 层、192 维、0.29 M 参数。它只看相邻帧，不读深度答案，用来检验这条路线的表征能兑现多少。
+\vspace{0.15cm}
+\begin{center}
+\includegraphics[width=0.86\textwidth]{pic/jepa.png}
 
-\src{LeCun, 2022；World Models（Ha \& Schmidhuber, 2018）；I-JEPA（Assran et al., 2023）}
+{\scriptsize 上下文编码器、预测器与目标编码器。本文只取其中的编码器，6 层、192 维、0.29 M 参数。}
+\end{center}
+
+\src{LeCun, 2022；Ha \& Schmidhuber, 2018；Assran et al., 2023（I-JEPA）}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -205,16 +208,16 @@ JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
 \vspace{0.15cm}
 {\small 差别来自三件事：架构上卷积的局部连接更贴合逐像素回归；信息组织上重建压成 36 个格、预测保留 576 个 token；容量上 ResNet18 有 11.2 M，JEPA 只有 0.29 M。}
 
-\src{本文第 6.2 节，实验记录见 runs/v7\_*}
+\src{He et al., 2016；Dosovitskiy et al., 2021；Kingma \& Welling, 2014；LeCun, 2022}
 \end{frame}
 
 %--------------------------------------------------------------
 \begin{frame}{误差的分布}
 
 \begin{columns}[T]
-\column{0.5\textwidth}
+\column{0.46\textwidth}
 \centering
-\small
+\scriptsize
 \begin{tabular}{@{}lccc@{}}
 \toprule
 距离 & 帧数 & $\delta_1$ & AbsRel \\
@@ -226,48 +229,48 @@ JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
 \bottomrule
 \end{tabular}
 
-\column{0.46\textwidth}
-0 至 10 米只占留出集 12\%，却是避障唯一要紧的区间，绝对相对误差是第二档的 \hl{3.2 倍}。
+\vspace{0.1cm}
+{\scriptsize 0 至 10 米只占留出集 12\%，绝对相对误差是第二档的 3.2 倍。6 至 9 米中位偏差 $+0.60$ 米，79\% 的帧读远。}
 
-\vspace{0.2cm}
-方向一致：6 至 9 米中位偏差 \hl{$+0.60$ 米}，79\% 的帧把障碍读远。
+\column{0.52\textwidth}
+\centering
+\includegraphics[width=\textwidth]{pic/distance.png}
 \end{columns}
 
-\vspace{0.3cm}
-读远意味着不触发。语料构成是原因之一：全部数据里 25 至 35 米占 69\%，近场只占 6\%。
-
-\src{本文第 6.3 节，误差分层脚本 scripts/analyze\_error.py}
+\src{Eigen et al., 2014（$\delta_1$ 与 AbsRel 的定义）；Godard et al., 2019}
 \end{frame}
 
 %--------------------------------------------------------------
 \begin{frame}{误差对避障意味着什么}
 
 \begin{columns}[T]
-\column{0.52\textwidth}
+\column{0.54\textwidth}
 \centering
-\scriptsize
+\includegraphics[width=\textwidth]{pic/confusion.png}
+
+{\scriptsize 9 米判据下两类错误的量级对比}
+
+\column{0.44\textwidth}
+{\scriptsize
 \begin{tabular}{@{}lccc@{}}
 \toprule
 模型 & 测试 $\delta_1$ & 9 m 识别率 & 漏判 \\
 \midrule
-ResNet18 随机 & 0.875 & 82.9\% & 82 \\
-ViT 随机 & 0.772 & 87.7\% & 59 \\
-变分自编码器 & 0.467 & \textbf{89.4\%} & \textbf{51} \\
+ResNet18 & 0.875 & 82.9\% & 82 \\
+ViT & 0.772 & 87.7\% & 59 \\
+VAE & 0.467 & \textbf{89.4\%} & \textbf{51} \\
 JEPA & 0.847 & 88.1\% & 57 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 
-\column{0.45\textwidth}
-$\delta_1$ 最高的模型，9 米判据上漏判最多；$\delta_1$ 只有 0.467 的 VAE，漏判与误触发都最少。
+\vspace{0.15cm}
+{\scriptsize $\delta_1$ 最高的模型漏判最多，$\delta_1$ 只有 0.467 的 VAE 漏判最少。}
+
+\vspace{0.1cm}
+{\scriptsize 名义 9 米实际只守 8.4 米，要真守住应取 9.6 米。}
 \end{columns}
 
-\vspace{0.3cm}
-两者度量的对象不同：$\delta_1$ 统计全图逐像素的准确度，识别率只关心临界带是否触发。
-
-\vspace{0.2cm}
-按近场偏差反推：名义 9 米实际只守住 8.4 米，要真守住应取 9.6 米。判据由误差分布决定，不是运动学常量。
-
-\src{本文第 6.4 节，判据取值依据 ISO 15964:2025 与 GB 42590-2023}
+\src{ISO 15964:2025；GB 42590-2023（判据取值）；Eigen et al., 2014}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -282,41 +285,48 @@ $\delta_1$ 最高的模型，9 米判据上漏判最多；$\delta_1$ 只有 0.46
 \vspace{0.3cm}
 本章要处理两件事：误差分布如何进入界面，人的判断如何回到训练数据。前者是呈现问题，后者是流程问题。
 
-\src{Parasuraman \& Riley, 1997；Endsley \& Kiris, 1995；本文第 7.1 节}
+\src{Parasuraman \& Riley, 1997；Endsley \& Kiris, 1995}
 \end{frame}
 
 \begin{frame}{从误差分布到界面规则}
 
-两条由误差分布导出的设计：
-
-\vspace{0.25cm}
+\begin{columns}[T]
+\column{0.46\textwidth}
 \begin{itemize}
-    \item 判定的距离在 10 米以内，该读数标为低置信；以外正常呈现。判据来自离线统计，运行时不需要模型多算一步
-    \item 判据本身也要改：由近场偏差反推，取值随速度调整，不是固定常数
+    \item 判定的距离在 10 米以内，读数标为低置信；以外正常呈现
+    \item 判据来自离线统计，运行时不需要模型多算一步
+    \item 判据取值也随速度调整，不是固定常数
 \end{itemize}
 
-\vspace{0.3cm}
-第一条对应信任校准。系统在近处不可靠，这一事实目前只存在于实验报告，尚未进入界面，而使用者的平均印象恰好覆盖了最危险的区间。
+\column{0.5\textwidth}
+\centering
+\includegraphics[width=\textwidth]{pic/console.png}
 
-\src{Parasuraman \& Riley, 1997；本文第 7.2 节}
+{\scriptsize 地面站原型：右侧同时给出前方最近距离与安全阈值}
+\end{columns}
+
+\vspace{0.1cm}
+{\small 系统在近处不可靠，这一事实目前只存在于实验报告，尚未进入界面，而使用者的平均印象恰好覆盖了最危险的区间。}
+
+\src{Parasuraman \& Riley, 1997；Endsley \& Kiris, 1995}
 \end{frame}
 
 %--------------------------------------------------------------
 \begin{frame}{人在回路的学习}
 
 \begin{itemize}
-    \item 每一次触发都留下可追溯的判断：可信、有保留、不可信、无法判断
-    \item 选后三项时展开结构化理由清单，记录带时间戳
-    \item 判断经溯源、评判、聚合三个环节，转化为下一版模型的训练数据
+    \item 每次触发都留下可追溯的判断：可信、有保留、不可信、无法判断
+    \item 选后三项时展开结构化理由，记录带时间戳
+    \item 判断经溯源、评判、聚合三环，成为下一版模型的训练数据
 \end{itemize}
 
-\vspace{0.3cm}
-理论依据是自动化使用中的误用与弃用：校准需要反馈，人必须能看见这一次判断的对错。
+\vspace{0.2cm}
+Chen 等提出的 OpenValue 已把这条链路工程化：模型在可配置场景中体验决策后果并生成结构化反思，评审者的判断与理由被链回原始记录，形成可审计的治理材料。
 
 \vspace{0.15cm}
-本文只接通了这条链路的第三环，效果尚未验证。
+{\small 两者对象不同，机制相同。本文只接通第三环，效果尚未验证。}
 
-\src{Bainbridge, 1983；Parasuraman \& Riley, 1997；本文第 7.3 节}
+\src{Bainbridge, 1983；Parasuraman \& Riley, 1997；Chen et al., 2026（OpenValue）}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -331,7 +341,7 @@ $\delta_1$ 最高的模型，9 米判据上漏判最多；$\delta_1$ 只有 0.46
 \vspace{0.3cm}
 \textbf{限制}：无容量对齐的对照，ResNet18 比 JEPA 大近四十倍；数据全部来自仿真，真机迁移未验证；复核闭环只接通，效果未评估。
 
-\src{本文第 8 章}
+\src{LeCun, 2022；ISO 15964:2025}
 \end{frame}
 
 %--------------------------------------------------------------
