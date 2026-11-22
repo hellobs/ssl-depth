@@ -250,12 +250,61 @@
 \end{frame}
 
 %--------------------------------------------------------------
+\begin{frame}{Transformer}
+
+{\footnotesize
+\begin{itemize}\setlength{\itemsep}{0.5pt}
+    \item 为机器翻译提出：输入一句，输出另一句，整句一次算完，不像循环网络那样逐词推进
+    \item 编码器与解码器各叠若干层，每层两个子层：自注意力与前馈网络，各带残差与层归一化
+    \item 自注意力让每个词与句中所有词算相关性，再按相关性加权求和；多头并行，各看一种关系
+    \item 词序不由结构隐含，改由位置编码显式给出
+\end{itemize}}
+
+\vspace{0.1cm}
+\begin{center}
+\begin{tikzpicture}[font=\small, node distance=4.6mm,
+  blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
+              inner sep=2.4pt, minimum height=8mm},
+  qk/.style={draw=scutsky!75, fill=scutsky!8, rounded corners=2pt, align=center,
+             inner sep=2.4pt, minimum height=8mm},
+  ar/.style={-{Latex[length=1.1mm]}, draw=scutblue!55, semithick}]
+
+\node[blk] (src) {输入序列};
+\node[blk, right=of src] (emb) {词向量 + 位置编码};
+\node[blk, right=of emb] (enc) {编码器 $\times N$};
+\node[blk, right=of enc] (dec) {解码器 $\times N$};
+\node[blk, right=of dec] (out) {输出序列};
+
+\draw[ar] (src) -- (emb);
+\draw[ar] (emb) -- (enc);
+\draw[ar] (enc) -- (dec);
+\draw[ar] (dec) -- (out);
+
+\node[qk, anchor=west] (q) at ([yshift=-11mm]emb.south west) {查询 $q$};
+\node[qk, right=of q] (k) {与所有键点积};
+\node[qk, right=of k] (sm) {softmax 归一化};
+\node[qk, right=of sm] (v) {对值加权求和};
+
+\draw[ar] (q) -- (k);
+\draw[ar] (k) -- (sm);
+\draw[ar] (sm) -- (v);
+
+\end{tikzpicture}
+
+\vspace{0.12cm}
+{\scriptsize 上：编码器与解码器的数据流。下：自注意力的四步，每个位置与所有位置各算一次相关性。}
+\end{center}
+
+\src{Vaswani A, et al. Attention Is All You Need. NIPS, 2017.}
+\end{frame}
+
+%--------------------------------------------------------------
 \begin{frame}{视觉 Transformer}
 
 {\footnotesize
 \begin{itemize}\setlength{\itemsep}{0.5pt}
-    \item Transformer 原本处理序列，核心是\textbf{自注意力}：每个位置与所有位置算相关性，再加权求和
-    \item 图像没有天然的先后。ViT 把图切成小块，每块拉直成向量，加上位置编码，块与块之间才有区分
+    \item 图像没有天然的先后。ViT 把图切成小块，每块拉直成一个向量，当作一个词
+    \item 切块也在省算力：像素级两两算相关性是六万乘六万，切成 576 块后是 576 乘 576
     \item 本文的 ViT：576 个块（每块 6$\times$6 像素）、6 层、192 维、3 个头，权重随机初始化
 \end{itemize}}
 
@@ -281,22 +330,23 @@
 \draw[ar] (emb) -- (enc);
 \draw[ar] (enc) -- (out);
 
-\node[blk, anchor=west] (q) at ([yshift=-11mm]img.south west) {查询 $q$};
-\node[qk, right=6mm of q] (k) {与 576 个键点积};
-\node[qk, right=of k] (sm) {softmax 归一化};
-\node[blk, right=of sm] (v) {对 576 个值加权求和};
+\node[blk, anchor=west] (p1) at ([yshift=-12mm]img.south west) {一个块 6$\times$6$\times$3};
+\node[blk, right=of p1] (p2) {拉直成 108 维};
+\node[blk, right=of p2] (p3) {投影到 192 维};
+\node[blk, right=of p3] (p4) {一个 token};
 
-\draw[ar] (q) -- (k);
-\draw[ar] (k) -- (sm);
-\draw[ar] (sm) -- (v);
+\draw[ar] (p1) -- (p2);
+\draw[ar] (p2) -- (p3);
+\draw[ar] (p3) -- (p4);
+
 
 \end{tikzpicture}
 
 \vspace{0.12cm}
-{\scriptsize 上：ViT 的数据流，一张图变成 576 个向量。下：自注意力的四步，每个块与其余 575 个块各算一次相关性。}
+{\scriptsize 上：一张图变成 576 个向量。下：一个块里的数怎么变成一个 192 维的词向量。}
 \end{center}
 
-\src{Vaswani A, et al. Attention Is All You Need. NIPS, 2017.}
+\src{Dosovitskiy A, Beyer L, Kolesnikov A, et al. An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale. ICLR, 2021.}
 \end{frame}
 
 %--------------------------------------------------------------
