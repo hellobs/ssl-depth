@@ -1,0 +1,287 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 答辩幻灯片 · 无人机单目测距的误差研究               %
+% 模板：SCUT beamer（取自世界模型模拟器研究）          %
+% 编译：xelatex                                       %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[serif, aspectratio=169]{beamer}
+\usepackage[fontset=windows]{ctex}
+\usepackage{latexsym,amsmath,xcolor,multicol,booktabs}
+\usepackage{graphicx}
+\usepackage{fourier}
+\usepackage{hyperref}
+
+\author[张子睿]{张子睿}
+\title[无人机单目测距的误差研究]{无人机单目测距：从表征到阈值到界面}
+\institute{
+    华南理工大学 \ · \ 设计学院 \\
+    \small 课程：小白学人工智能
+}
+\date{\small \today}
+\usepackage{SCUTstyle}
+
+\newcommand{\hl}[1]{\textbf{\textcolor{scutblue}{#1}}}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+    \vspace*{-0.8cm}
+    \begin{figure}[htpb]
+        \begin{center}
+            \includegraphics[height=2.1cm]{pic/scut-logo.png}
+        \end{center}
+    \end{figure}
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{问题定义：单目深度估计}
+
+\textbf{单目深度估计}：输入一张普通的 RGB 照片，输出每个像素到相机的距离。
+
+\vspace{0.35cm}
+\begin{itemize}
+    \item 单张图在几何上没有唯一解。同一个像点，可能来自近处的小物体，也可能来自远处的大物体。
+    \item 人能看出来，靠的是一组线索：近处纹理粗、远处纹理细；被遮挡的在后；车道线宽度、楼层高度这类已知尺寸可以反推；平行线汇聚到消失点。
+    \item 这些线索都不精确，所以单目测距天生带误差，而且误差往往有方向。
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{本文要的是米制深度}，不是深度排序。排序只能说谁远谁近，米数才能拿来判断会不会撞。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{判据的来源：制动距离}
+
+\begin{columns}[T]
+\column{0.55\textwidth}
+\begin{itemize}
+    \item 配送机巡航约 \hl{8 米每秒}
+    \item 从发现障碍到完成制动约 \hl{1 秒}
+    \item 这段反应时间对应 \hl{8 米}位移
+\end{itemize}
+
+\vspace{0.3cm}
+前视感知因此必须在 9 米以外给出可信读数，否则即使判断正确也来不及制动。
+
+\column{0.42\textwidth}
+\centering
+\begin{tabular}{@{}lc@{}}
+\toprule
+量 & 数值 \\
+\midrule
+巡航速度 & 8 m/s \\
+制动时间 & 约 1 s \\
+位移 & 8 m \\
+判据 & \textbf{9 m} \\
+\bottomrule
+\end{tabular}
+\end{columns}
+
+\vspace{0.4cm}
+模型只做一件事：判断前方最近障碍有没有进入 9 米。进入之后绕行、减速还是返航，由规划层决定。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{数据采集与划分}
+
+\begin{itemize}
+    \item 平台：Unreal Engine 4 的 AirSim，场景为 CityEnviron 城市峡谷
+    \item 采集：422 个航段、75,194 帧，清洗后保留 48,767 帧
+    \item 真值：渲染引擎直接输出，与图像逐像素对齐，单位是米
+    \item 划分：按航段切，375 段训练、14 段验证、15 段测试
+\end{itemize}
+
+\vspace{0.35cm}
+按航段切而不是按帧随机切，是因为同一趟的相邻帧只隔 0.2 秒，随机切会让测试集里的画面在训练时见过，指标会虚高。
+
+\vspace{0.3cm}
+40 米以外的远景与大面积天空被剔除，数据在近场偏薄，这一构成会影响后面的误差分布。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{四条表征路线}
+
+\begin{table}[]
+\centering
+\small
+\begin{tabular}{@{}llp{7.2cm}@{}}
+\toprule
+\textbf{路线} & \textbf{名字} & \textbf{一句话说明} \\
+\midrule
+从零学 & ResNet18 & 卷积网络，权重随机，未经训练 \\
+从零学 & 视觉 Transformer & 同为随机初始化，换成全局注意力 \\
+域内自监督 & 变分自编码器 & 在本数据上学习把画面压成 latent 再还原 \\
+域内自监督 & JEPA & 在本数据上学习用当前帧预测下一帧的表征 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.3cm}
+前两条代表没有任何先验，后两条代表在本数据上自己学。四条都不读深度答案。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{实验控制：固定编码器，只更换表征}
+
+只让一个变量动：换掉特征提取网络，其余全部锁死。
+
+\begin{itemize}
+    \item 编码器全部冻结，参数一个都不改
+    \item 四条共用一个解码头，0.81 M 参数
+    \item 同样的数据、15 轮、同一优化器、同一学习率
+\end{itemize}
+
+\vspace{0.35cm}
+这意味着深度只由解码头学，编码器不接收任何深度信号。所以这张表测的是：各表征里还剩多少能被解码出来的深度信息。
+
+\vspace{0.25cm}
+它不回答单一模型的精度上限，只回答这些表征对深度回归的支撑程度。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{主结果：四条路线的精度}
+
+\begin{table}[]
+\centering
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{特征提取网络} & \textbf{验证集 $\delta_1$} & \textbf{测试集 $\delta_1$} & \textbf{测试集 AbsRel} \\
+\midrule
+ResNet18 随机初始化 & 0.855 & \hl{0.875} & \hl{0.135} \\
+ViT 随机初始化 & 0.786 & 0.772 & 0.230 \\
+变分自编码器 & 0.554 & 0.467 & 0.566 \\
+JEPA 自监督 & \hl{0.872} & 0.847 & 0.161 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.25cm}
+$\delta_1$ 是预测与真值的比值落在 0.8 到 1.25 之间的像素比例，越高越好。
+
+\vspace{0.2cm}
+两个随机初始化的模型排在前二，JEPA 第三，VAE 最末。顺序与直觉相反，原因有三：卷积的局部先验、重建与预测两种目标、以及未对齐的参数量。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{误差的距离分层}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\centering
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+距离 & 帧数 & $\delta_1$ & AbsRel \\
+\midrule
+0 至 10 m & 408 & \textbf{0.692} & 0.361 \\
+10 至 20 m & 1157 & 0.904 & 0.114 \\
+20 至 40 m & 1055 & 0.884 & 0.098 \\
+40 至 80 m & 706 & 0.884 & 0.101 \\
+\bottomrule
+\end{tabular}
+
+\column{0.46\textwidth}
+0 至 10 米只占留出集的 12\%，却是避障唯一要紧的区间。
+
+它的绝对相对误差是第二档的 \hl{3.2 倍}。
+
+\vspace{0.2cm}
+方向也一致：6 至 9 米中位偏差 \hl{$+0.60$ 米}，79\% 的帧把障碍读远。
+\end{columns}
+
+\vspace{0.35cm}
+读远意味着不触发。语料构成是原因之一：全部数据里 25 至 35 米占 69\%，近场只占 6\%。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{指标排序与任务排序的背离}
+
+\begin{table}[]
+\centering
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{特征提取网络} & \textbf{测试 $\delta_1$} & \textbf{9 米识别率} & \textbf{漏判} & \textbf{误触发} \\
+\midrule
+ResNet18 随机 & 0.875 & 82.9\% & 82 & 27 \\
+ViT 随机 & 0.772 & 87.7\% & 59 & 56 \\
+变分自编码器 & 0.467 & \hl{89.4\%} & \hl{51} & \hl{23} \\
+JEPA 自监督 & 0.847 & 88.1\% & 57 & 61 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.3cm}
+$\delta_1$ 最高的模型，9 米判据上漏判最多；$\delta_1$ 只有 0.467 的 VAE，漏判和误触发都最少。
+
+\vspace{0.2cm}
+两者度量的对象不同：$\delta_1$ 统计全图逐像素的准确度，识别率只关心临界带是否触发。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{判据的重估}
+
+按近场偏差反推：
+
+\vspace{0.25cm}
+\begin{itemize}
+    \item 名义 9 米的判据，因为读数整体偏近，实际只守住约 \hl{8.4 米}
+    \item 要真的守住 9 米，判据应取 \hl{9.6 米}，工程上取 10 米
+    \item 若放宽到 12 米，识别率从 82.9\% 升到 \hl{96.1\%}，代价是动作更频繁
+\end{itemize}
+
+\vspace{0.35cm}
+参数不宜视为运动学导出的常量，可由误差分布的符号与量级反推。这一处调整发生在设计层面，不涉及算法改动。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{界面规则与复核流程}
+
+两条由误差分布导出的设计：
+
+\vspace{0.3cm}
+\begin{itemize}
+    \item \textbf{距离在 10 米以内，该读数标为低置信}。判据来自离线统计，运行时不需要模型多算一步。
+    \item \textbf{每一次触发都留下可复核的判断}。评审者选可信、有保留、不可信、无法判断，选后三项时填结构化理由，记录带时间戳。
+\end{itemize}
+
+\vspace{0.35cm}
+第一条对应信任校准：系统在近处不可靠，这一事实目前只存在于实验报告，尚未进入界面。
+
+\vspace{0.2cm}
+第二条让人的判断回到训练数据。本文只接通了这条链路，效果尚未验证。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{结论与限制}
+
+\begin{enumerate}
+    \item 表征的差异是真实的。冻结编码器、只换表征，测试集 $\delta_1$ 从 0.467 到 0.875。
+    \item 误差集中在近场且方向单一。0 至 10 米 $\delta_1$ 为 0.692，近场系统性地读远。
+    \item 指标排序与任务排序会背离。$\delta_1$ 最高的模型，在 9 米判据上漏判最多。
+\end{enumerate}
+
+\vspace{0.35cm}
+\textbf{限制}：无容量对齐的对照，ResNet18 比 JEPA 大近四十倍；数据全部来自仿真，真机迁移未验证；复核闭环只接通，效果未评估。
+
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{}
+    \centering
+    \vspace{2cm}
+    {\Large 谢谢，请提问。}
+\end{frame}
+
+\end{document}
