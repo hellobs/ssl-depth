@@ -164,7 +164,9 @@ Amazon 的 MK30 在 2024 年 5 月拿到美国联邦航空局的超视距运行�
 
 地面设调度中心，一名调度员同时监控 12 架飞行器。他不操纵飞机，只在异常发生时介入。
 
-系统设定一条安全判据：机头正前方 9 米以内出现障碍时，判定为必须制动。9 米来自 8 米每秒的巡航速度与约 1 秒的总响应延迟，是最后一刻必须已经作出决定的距离，不是避障的启动距离。正常绕行应在二十米以外开始，本文不测那一段，只测这条紧急线。判据随速度变化：速度减半，这条线相应缩短。
+系统设定一条安全判据：机头正前方 9 米以内出现障碍时，判定为必须制动。取值依据来自标准。ISO 15964:2025 把短程感知避障系统的探测范围定为 7 至 30 米、响应时间不超过 1 秒\cite{iso15964}；GB 42590-2023 对民用无人机的感知与避障提出同类要求\cite{gb42590}。按本场景 8 米每秒的巡航速度，1 秒响应对应 8 米位移，加 1 米余量取 9 米。
+
+这条线是最后一刻必须已经作出决定的距离，不是避障的启动距离。正常绕行应在二十米以外开始，由规划层负责，本文不测那一段。判据随速度变化：速度减半，这条线相应缩短。
 
 这条判据在两个方向上都会出错。漏判是前方真有障碍而系统没有响应，后果是碰撞。误判是前方没有障碍而系统触发动作，后果是配送延误与运力浪费。
 
@@ -628,6 +630,10 @@ R = \frac{N_{\mathrm{TP}}}{N_{\mathrm{TP}} + N_{\mathrm{FN}}}
 \bibitem{mil} Liang Y, Zhang Z, Xian C, He S. Delving Into Multi-Illumination Monocular Depth Estimation: A New Dataset and Method[J]. IEEE Transactions on Multimedia, 2025, 27(1): 1018-1032.
 
 \bibitem{ijepa} Assran M, Duquenne P A, Caron M, et al. Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture[C]. IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2023.
+
+\bibitem{iso15964} ISO 15964:2025. Detection and avoidance systems for uncrewed aircraft systems[S]. Geneva: International Organization for Standardization, 2025.
+
+\bibitem{gb42590} GB 42590-2023. 民用无人驾驶航空器系统安全要求[S]. 北京: 中国国家标准化管理委员会, 2023.
 
 \bibitem{marigold} Ke B, Obukhov A, Huang S, et al. Repurposing Diffusion-Based Image Generators for Monocular Depth Estimation[C]//CVPR. 2024.
 
