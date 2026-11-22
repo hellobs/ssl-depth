@@ -61,7 +61,7 @@
 %--------------------------------------------------------------
 \begin{frame}{单目深度估计}
 
-\textbf{单目}指只用一只相机，\textbf{深度估计}指给每个像素一个到相机的距离。输入一张 RGB 照片，输出一张同尺寸的距离图。
+\textbf{单目}指只用一只相机。\textbf{深度估计}给每个像素估一个沿光轴的距离，即相机坐标系下的 $Z$ 值。它不是到相机中心的直线距离，视场边缘的读数比直线距离短。
 
 \vspace{0.2cm}
 \begin{itemize}
@@ -71,7 +71,7 @@
 \end{itemize}
 
 \vspace{0.2cm}
-\textbf{相对深度}只要求大小顺序，允许整体缩放。\textbf{米制深度}直接给米数。无人机要判断九米外有没有障碍，只能要后者。
+\textbf{相对深度}只要求大小顺序，允许整体缩放。\textbf{米制深度}直接给米数。无人机要判断九米以内有没有障碍，只能要后者。
 
 \vspace{0.1cm}
 {\small 本文训练的标签是\textbf{视差}，即距离的倒数 $1/d$。取倒数后，近处的差异被放大，模型更容易学准近处，而近处正是避障关心的区间。}
@@ -151,6 +151,26 @@
 \end{frame}
 
 %--------------------------------------------------------------
+\begin{frame}{残差网络}
+
+\begin{itemize}
+    \item ResNet18 是卷积网络的一种固定结构：18 个带权重的层，四个阶段，每阶段两个残差块，每过一阶段分辨率减半、通道加倍
+    \item 本文去掉末尾的分类头，取最后的特征图当表征：512 个通道、4$\times$6 格，接同一个深度头
+    \item 加深并不必然更好：二十层之后训练误差反而上升，原因是梯度逐层相乘越传越小，前面几层收不到更新，不是过拟合
+    \item 残差块把输入直接加到输出上，反向传播有一条不经过卷积的短路，每层只需学输入与输出的差值
+\end{itemize}
+
+\vspace{0.1cm}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{pic/resblock.png}
+
+{\scriptsize 残差块结构。本文的 ResNet18 权重随机初始化，不加载预训练。}
+\end{center}
+
+\src{He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.}
+\end{frame}
+
+%--------------------------------------------------------------
 \begin{frame}{视觉 Transformer}
 
 Transformer 原本处理序列，核心是\textbf{自注意力}：每个元素与所有元素计算相关性，再按相关性加权求和，得到新的表示。多个注意力头并行，各自捕捉不同的关系。它没有卷积的局部窗口假设，因此要靠位置编码告诉模型先后顺序。
@@ -166,24 +186,6 @@ Transformer 原本处理序列，核心是\textbf{自注意力}：每个元素�
 \end{center}
 
 \src{Vaswani A, et al. Attention Is All You Need. NIPS, 2017.}
-\end{frame}
-
-\begin{frame}{残差网络}
-
-\begin{itemize}
-    \item 层数增加并不必然更好，二十层之后继续加深，训练误差反而上升
-    \item 原因不是过拟合，而是梯度逐层回传时被反复相乘，越传越小，前面几层收不到更新
-    \item 残差块把输入直接加到输出上，反向传播有一条不经过卷积的短路，网络只需学输入与输出的差值
-\end{itemize}
-
-\vspace{0.15cm}
-\begin{center}
-\includegraphics[width=0.92\textwidth]{pic/resblock.png}
-
-{\scriptsize 残差块结构。本文用 ResNet18，四个阶段共 8 个残差块，权重随机初始化。}
-\end{center}
-
-\src{He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.}
 \end{frame}
 
 %--------------------------------------------------------------
