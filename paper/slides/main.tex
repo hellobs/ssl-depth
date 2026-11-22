@@ -63,7 +63,7 @@
 %--------------------------------------------------------------
 \begin{frame}{单目深度估计}
 
-\textbf{单目}指只用一只相机。\textbf{深度}是场景点沿光轴到相机平面的距离，即相机坐标系下的 $Z$ 分量。\textbf{深度估计}就是从一张图把每个像素对应的这个量恢复出来。
+\textbf{单目}指只用一只相机，\textbf{深度估计}指给每个像素一个到相机的距离。输入一张 RGB 照片，输出一张同尺寸的距离图。
 
 \vspace{0.2cm}
 \begin{itemize}
@@ -76,7 +76,7 @@
 \textbf{相对深度}只要求顺序，允许整体缩放。\textbf{米制深度}直接给米数。无人机要判断九米以内有没有障碍，只能要后者。
 
 \vspace{0.1cm}
-{\small 标签取\textbf{视差} $1/d$，即深度的倒数。倒过来之后近处差异被放大，而近处正是避障关心的区间。}
+{\small 标签取\textbf{视差} $1/d$，即距离的倒数。倒过来之后近处差异被放大，而近处正是避障关心的区间。}
 
 \src{Ranftl R, Bochkovskiy A, Koltun V. Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer. TPAMI, 2020.}
 \end{frame}
@@ -213,36 +213,37 @@
 
 \vspace{0.4cm}
 \begin{center}
-\begin{tikzpicture}[font=\footnotesize, node distance=4mm,
+\begin{tikzpicture}[font=\small, node distance=4.6mm,
   blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
-              inner sep=2.4pt, minimum height=8mm},
+              inner sep=3pt, minimum height=10mm},
   acc/.style={draw=scutgold!85, fill=scutgold!12, rounded corners=2pt, align=center,
-              inner sep=2.4pt, minimum height=8mm},
+              inner sep=3pt, minimum height=10mm},
+  ch/.style={font=\scriptsize, text=scutblue!70},
   ar/.style={-{Latex[length=1.2mm]}, draw=scutblue!55, semithick}]
 
-\node[blk] (in) {输入\\192$\times$108};
-\node[blk, right=of in] (stem) {卷积 + 池化\\64};
-\node[blk, right=of stem] (s1) {阶段一\\2 块，64};
-\node[blk, right=of s1] (s2) {阶段二\\2 块，128};
-\node[blk, right=of s2] (s3) {阶段三\\2 块，256};
-\node[blk, right=of s3] (s4) {阶段四\\2 块，512};
-\node[acc, right=of s4] (ft) {特征图\\4$\times$6$\times$512};
+\node[blk] (in) {输入 192$\times$108};
+\node[blk, right=of in] (stem) {卷积 + 池化};
+\node[blk, right=of stem] (s1) {阶段一};
+\node[blk, right=of s1] (s2) {阶段二};
+\node[blk, right=of s2] (s3) {阶段三};
+\node[blk, right=of s3] (s4) {阶段四};
+\node[acc, right=of s4] (ft) {4$\times$6$\times$512};
+
+\node[ch, below=1.4mm of stem] {64};
+\node[ch, below=1.4mm of s1] {64};
+\node[ch, below=1.4mm of s2] {128};
+\node[ch, below=1.4mm of s3] {256};
+\node[ch, below=1.4mm of s4] {512};
 
 \draw[ar] (in) -- (stem);
 \draw[ar] (stem) -- (s1);
 \draw[ar] (s1) -- (s2);
 \draw[ar] (s2) -- (s3);
 \draw[ar] (s3) -- (s4);
-\draw[ar] (s4) -- (ft);
-
-\node[below=3mm of s1, font=\scriptsize, text=scutgold] {尺寸不变};
-\node[below=3mm of s2, font=\scriptsize, text=scutgold] {减半};
-\node[below=3mm of s3, font=\scriptsize, text=scutgold] {减半};
-\node[below=3mm of s4, font=\scriptsize, text=scutgold] {减半};
 
 \end{tikzpicture}
 
-{\scriptsize 本文的 ResNet18 主干。跨阶段减半，通道加倍，末层输出 4$\times$6$\times$512，接深度头。}
+{\scriptsize 本文的 ResNet18 主干。每阶段两个残差块，框下数字为通道数；跨阶段分辨率减半、通道加倍。}
 \end{center}
 
 \src{He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.}
@@ -329,7 +330,7 @@
 
 \vspace{0.1cm}
 \begin{center}
-\begin{tikzpicture}[font=\small, node distance=6mm,
+\begin{tikzpicture}[font=\small, node distance=4.6mm,
   blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
               inner sep=2.4pt, minimum height=8mm},
   enc/.style={draw=scutblue!75, fill=scutblue!14, rounded corners=2pt, align=center,
