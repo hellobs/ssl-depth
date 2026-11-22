@@ -213,37 +213,37 @@
 
 \vspace{0.4cm}
 \begin{center}
-\begin{tikzpicture}[font=\small, node distance=4.6mm,
+\begin{tikzpicture}[font=\scriptsize, node distance=4mm,
   blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
-              inner sep=3pt, minimum height=10mm},
-  acc/.style={draw=scutgold!85, fill=scutgold!12, rounded corners=2pt, align=center,
-              inner sep=3pt, minimum height=10mm},
-  ch/.style={font=\scriptsize, text=scutblue!70},
-  ar/.style={-{Latex[length=1.2mm]}, draw=scutblue!55, semithick}]
+              inner sep=2.6pt, minimum height=10mm},
+  io/.style={align=center, font=\scriptsize, text=scutblue!85},
+  ch/.style={font=\tiny, text=scutblue!65},
+  ar/.style={-{Latex[length=1.1mm]}, draw=scutblue!55, semithick}]
 
-\node[blk] (in) {输入 192$\times$108};
-\node[blk, right=of in] (stem) {卷积 + 池化};
-\node[blk, right=of stem] (s1) {阶段一};
-\node[blk, right=of s1] (s2) {阶段二};
-\node[blk, right=of s2] (s3) {阶段三};
-\node[blk, right=of s3] (s4) {阶段四};
-\node[acc, right=of s4] (ft) {4$\times$6$\times$512};
+\node[io] (in) {输入\\192$\times$108$\times$3};
+\node[blk, right=6mm of in] (stem) {7$\times$7 卷积 64\\3$\times$3 池化};
+\node[blk, right=of stem] (s1) {阶段一\\3$\times$3 卷积 $\times$2};
+\node[blk, right=of s1] (s2) {阶段二\\3$\times$3 卷积 $\times$2};
+\node[blk, right=of s2] (s3) {阶段三\\3$\times$3 卷积 $\times$2};
+\node[blk, right=of s3] (s4) {阶段四\\3$\times$3 卷积 $\times$2};
+\node[io, right=6mm of s4] (out) {特征图\\4$\times$6$\times$512};
 
-\node[ch, below=1.4mm of stem] {64};
-\node[ch, below=1.4mm of s1] {64};
-\node[ch, below=1.4mm of s2] {128};
-\node[ch, below=1.4mm of s3] {256};
-\node[ch, below=1.4mm of s4] {512};
+\node[ch, below=1.2mm of stem] {64 · 48$\times$27};
+\node[ch, below=1.2mm of s1] {64 · 48$\times$27};
+\node[ch, below=1.2mm of s2] {128 · 24$\times$14};
+\node[ch, below=1.2mm of s3] {256 · 12$\times$7};
+\node[ch, below=1.2mm of s4] {512 · 4$\times$6};
 
 \draw[ar] (in) -- (stem);
 \draw[ar] (stem) -- (s1);
 \draw[ar] (s1) -- (s2);
 \draw[ar] (s2) -- (s3);
 \draw[ar] (s3) -- (s4);
+\draw[ar] (s4) -- (out);
 
 \end{tikzpicture}
 
-{\scriptsize 本文的 ResNet18 主干。每阶段两个残差块，框下数字为通道数；跨阶段分辨率减半、通道加倍。}
+{\scriptsize 每阶段两个残差块，第一个块减半、通道加倍；全局池化与分类头已去掉，末层接深度头。}
 \end{center}
 
 \src{He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.}
