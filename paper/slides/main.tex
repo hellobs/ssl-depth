@@ -38,20 +38,20 @@
 %--------------------------------------------------------------
 \begin{frame}{单目深度估计}
 
-输入一张普通 RGB 照片，输出每个像素到相机的距离。
+\textbf{单目}指只用一只相机，\textbf{深度估计}指给每个像素一个到相机的距离。输入一张 RGB 照片，输出一张同尺寸的距离图。
 
-\vspace{0.25cm}
+\vspace{0.2cm}
 \begin{itemize}
     \item 单张图在几何上没有唯一解：同一个像点，可能来自近处的小物体，也可能来自远处的大物体
-    \item 人靠线索判断：近处纹理粗、远处细；被遮挡的在后；车道线宽度这类已知尺寸可以反推；平行线汇聚到消失点
+    \item 人靠线索判断：近处纹理粗、远处细；被遮挡的物体在后；车道线宽度这类已知尺寸可以反推；平行线汇聚到消失点
     \item 这些线索都不精确，单目测距天生带误差，而且误差往往有方向
 \end{itemize}
 
-\vspace{0.25cm}
+\vspace{0.2cm}
 \textbf{相对深度}只要求大小顺序，允许整体缩放。\textbf{米制深度}直接给米数。无人机要判断九米外有没有障碍，只能要后者。
 
-\vspace{0.15cm}
-本文的训练目标是视差，即距离的倒数。视差对近距离更敏感，避障关心的正是近距离。
+\vspace{0.1cm}
+{\small 本文训练的标签是\textbf{视差}，即距离的倒数 $1/d$。取倒数后，近处的差异被放大，模型更容易学准近处，而近处正是避障关心的区间。}
 
 \src{MiDaS（Ranftl et al., 2020）；Depth Anything（Yang et al., 2024）；Monodepth2（Godard et al., 2019）}
 \end{frame}
@@ -150,9 +150,9 @@
 \begin{frame}{变分自编码器}
 
 \begin{itemize}
-    \item 编码器把一帧压成低维表征，解码器从表征还原这一帧
+    \item 编码器把一帧压成低维向量（称为 latent，隐变量），解码器再从它还原这一帧
     \item 变分的意思是编码器输出均值与方差，代表一个高斯分布，从里面采样再解码
-    \item 损失有两项：重建误差，以及让分布靠近标准正态的 KL 散度
+    \item 损失有两项：重建误差，以及 KL 散度，后者衡量学到的分布与标准正态差多少
     \item KL 让隐空间连续，相近的点解码出相近的画面
 \end{itemize}
 
@@ -171,7 +171,7 @@
 \begin{itemize}
     \item LeCun 的主张：不在像素层面预测未来，而在表征空间预测世界的下一步
     \item JEPA 只用相邻帧，预测下一帧的表征，不还原像素；目标由教师编码器给出，教师只做指数滑动平均，避免表征塌成常数
-    \item 编码器是视觉 Transformer，把图切成 6$\times$6 的小块共 576 个 token，自注意力一次看到全图
+    \item 编码器是视觉 Transformer：把图切成 6$\times$6 的小块，每块变成一个向量，称为一个 token，共 576 个；自注意力让每个 token 与所有 token 计算相关性，一次看到全图
 \end{itemize}
 
 \vspace{0.15cm}
@@ -189,7 +189,7 @@
 
 \begin{table}[]
 \centering
-\scriptsize
+\footnotesize
 \begin{tabular}{@{}llccc@{}}
 \toprule
 特征提取网络 & 表征来源 & 验证集 $\delta_1$ & 测试集 $\delta_1$ & 测试集 AbsRel \\
@@ -203,10 +203,18 @@ JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
 \end{table}
 
 \vspace{0.15cm}
-{\scriptsize 编码器全部固定，只训练同一个 0.81 M 解码头；同数据、15 轮、同优化器，差别只来自表征。}
+{\footnotesize \textbf{$\delta_1$} 是像素级命中率：预测与真实的比值落在 0.8 至 1.25 之间的像素占比，越高越好。\textbf{AbsRel} 是平均相对误差，越低越好。}
 
 \vspace{0.15cm}
-{\small 差别来自三件事：架构上卷积的局部连接更贴合逐像素回归；信息组织上重建压成 36 个格、预测保留 576 个 token；容量上 ResNet18 有 11.2 M，JEPA 只有 0.29 M。}
+{\footnotesize 编码器全部固定，只训练同一个 0.81 M 的解码头（M 指百万参数），因此差别只来自表征。三处原因：}
+
+\vspace{0.1cm}
+{\small
+\begin{itemize}
+    \item 架构：卷积的局部连接比全局注意力更贴合逐像素回归
+    \item 信息组织：重建把画面压成 36 个格，预测保留 576 个 token
+    \item 容量：ResNet18 有 11.2 M 参数，JEPA 编码器只有 0.29 M
+\end{itemize}}
 
 \src{He et al., 2016；Dosovitskiy et al., 2021；Kingma \& Welling, 2014；LeCun, 2022}
 \end{frame}
@@ -215,7 +223,7 @@ JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
 \begin{frame}{误差的分布}
 
 \begin{columns}[T]
-\column{0.46\textwidth}
+\column{0.48\textwidth}
 \centering
 \scriptsize
 \begin{tabular}{@{}lccc@{}}
@@ -230,12 +238,17 @@ JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
 \end{tabular}
 
 \vspace{0.1cm}
-{\scriptsize 0 至 10 米只占留出集 12\%，绝对相对误差是第二档的 3.2 倍。6 至 9 米中位偏差 $+0.60$ 米，79\% 的帧读远。}
+{\scriptsize 把测试集按真实距离分四组，各自算 $\delta_1$ 与 AbsRel。0 至 10 米只占 12\%，绝对相对误差却是第二组的 3.2 倍。}
 
-\column{0.52\textwidth}
+\column{0.5\textwidth}
 \centering
 \includegraphics[width=\textwidth]{pic/distance.png}
+
+{\scriptsize 各组平均精度。越近越差}
 \end{columns}
+
+\vspace{0.1cm}
+{\small 方向也一致：6 至 9 米的中位偏差是 $+0.60$ 米，79\% 的帧把障碍读远。读远意味着不触发。}
 
 \src{Eigen et al., 2014（$\delta_1$ 与 AbsRel 的定义）；Godard et al., 2019}
 \end{frame}
@@ -243,18 +256,21 @@ JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
 %--------------------------------------------------------------
 \begin{frame}{误差对避障意味着什么}
 
+{\small 取前方中心区域距离的 5\% 分位数（排序后第 5\% 位置的值，避开噪点），小于 9 米即判定必须制动。}
+
+\vspace{0.05cm}
 \begin{columns}[T]
-\column{0.54\textwidth}
+\column{0.5\textwidth}
 \centering
-\includegraphics[width=\textwidth]{pic/confusion.png}
+\includegraphics[width=0.85\textwidth]{pic/confusion.png}
 
-{\scriptsize 9 米判据下两类错误的量级对比}
+{\scriptsize 9 米判据下两类错误的量级}
 
-\column{0.44\textwidth}
+\column{0.48\textwidth}
 {\scriptsize
 \begin{tabular}{@{}lccc@{}}
 \toprule
-模型 & 测试 $\delta_1$ & 9 m 识别率 & 漏判 \\
+模型 & 测试 $\delta_1$ & 识别率 & 漏判 \\
 \midrule
 ResNet18 & 0.875 & 82.9\% & 82 \\
 ViT & 0.772 & 87.7\% & 59 \\
@@ -262,13 +278,10 @@ VAE & 0.467 & \textbf{89.4\%} & \textbf{51} \\
 JEPA & 0.847 & 88.1\% & 57 \\
 \bottomrule
 \end{tabular}}
-
-\vspace{0.15cm}
-{\scriptsize $\delta_1$ 最高的模型漏判最多，$\delta_1$ 只有 0.467 的 VAE 漏判最少。}
-
-\vspace{0.1cm}
-{\scriptsize 名义 9 米实际只守 8.4 米，要真守住应取 9.6 米。}
 \end{columns}
+
+\vspace{0.05cm}
+{\scriptsize 识别率：该触发时确实触发的比例。漏判：该触发却没触发。$\delta_1$ 最高的模型漏判最多，名义 9 米只守 8.4 米。}
 
 \src{ISO 15964:2025；GB 42590-2023（判据取值）；Eigen et al., 2014}
 \end{frame}
