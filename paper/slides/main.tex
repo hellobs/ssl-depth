@@ -11,17 +11,40 @@
 \usepackage{fourier}
 \usepackage{hyperref}
 
-\author[张子睿]{张子睿}
-\title[无人机单目测距的误差研究]{无人机单目测距：从表征到阈值到界面}
+\author[张子睿等]{张子睿 \quad 盛祺 \quad 刘子瑄 \quad 马婧怡}
+\title[基于人工智能的无人机单目深度测距]{基于人工智能的无人机单目深度测距：误差研究与设计学分析}
 \institute{
     华南理工大学 \ · \ 设计学院 \\
     \small 课程：小白学人工智能
 }
 \date{\small \today}
 \usepackage{SCUTstyle}
+\usepackage{etoolbox}
 
 \newcommand{\hl}[1]{\textbf{\textcolor{scutblue}{#1}}}
-\newcommand{\src}[1]{\vfill{\tiny\color{gray} 参考：#1}}
+
+% 每页的文献固定在页脚上一行，位置不随正文长短变化
+\newcommand{\currentref}{}
+\newcommand{\src}[1]{\gdef\currentref{#1}}
+\AtBeginEnvironment{frame}{\gdef\currentref{}}
+\setbeamertemplate{footline}{%
+  \leavevmode%
+  \vbox{%
+    \hbox{\hspace*{0.3cm}\parbox{\dimexpr\paperwidth-0.6cm\relax}{\raggedright\tiny\color{gray}\currentref}}%
+    \vspace{0.4ex}%
+    \hbox{%
+      \begin{beamercolorbox}[wd=.3\paperwidth,ht=2.25ex,dp=1ex,center]{section in foot}%
+        华南理工大学%
+      \end{beamercolorbox}%
+      \begin{beamercolorbox}[wd=.4\paperwidth,ht=2.25ex,dp=1ex,center]{subsection in foot}%
+        \insertshorttitle%
+      \end{beamercolorbox}%
+      \begin{beamercolorbox}[wd=.3\paperwidth,ht=2.25ex,dp=1ex,right]{section in foot}%
+        \insertframenumber{} / \inserttotalframenumber\hspace*{2ex}%
+      \end{beamercolorbox}}%
+  }%
+  \vskip0pt%
+}
 
 \begin{document}
 
@@ -53,7 +76,7 @@
 \vspace{0.1cm}
 {\small 本文训练的标签是\textbf{视差}，即距离的倒数 $1/d$。取倒数后，近处的差异被放大，模型更容易学准近处，而近处正是避障关心的区间。}
 
-\src{MiDaS（Ranftl et al., 2020）；Depth Anything（Yang et al., 2024）；Monodepth2（Godard et al., 2019）}
+\src{Ranftl R, Bochkovskiy A, Koltun V. Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer. TPAMI, 2020.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -88,7 +111,7 @@
 \vspace{0.15cm}
 {\small 这条线是最后一刻必须已经作出决定的距离，不是避障启动距离。正常绕行在二十米以外开始，由规划层负责。}
 
-\src{ISO 15964:2025 无人机感知与避障系统；GB 42590-2023 民用无人驾驶航空器系统安全要求}
+\src{ISO 15964:2025. Detection and avoidance systems for uncrewed aircraft systems. ISO, 2025.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -107,7 +130,7 @@
 \vspace{0.15cm}
 40 米以外的远景与大面积天空被剔除，数据在近场偏薄。这一构成会影响后面的误差分布。
 
-\src{Shah et al., 2018（AirSim）}
+\src{Shah S, Dey D, Lovett C, Kapoor A. AirSim: High-Fidelity Visual and Physical Simulation for Autonomous Vehicles. FSR, 2017.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -124,7 +147,7 @@
 \vspace{0.2cm}
 与全连接相比，卷积把参数量压到几千分之一，代价是只擅长局部模式，全局关系要靠堆层数与注意力机制补。
 
-\src{LeNet（LeCun et al., 1998）；ResNet（He et al., 2016）}
+\src{LeCun Y, Bottou L, Bengio Y, Haffner P. Gradient-Based Learning Applied to Document Recognition. Proceedings of the IEEE, 1998.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -143,7 +166,7 @@
 {\scriptsize 残差块结构。本文用 ResNet18，四个阶段共 8 个残差块，权重随机初始化。}
 \end{center}
 
-\src{He et al., 2016（ResNet）}
+\src{He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -162,7 +185,7 @@
 \vspace{0.15cm}
 本文取它的编码器。96$\times$96 的输入压成 6$\times$6 个格，每格 256 维，一共 36 个格。它学的是把画面还原出来，不是测距。
 
-\src{VAE（Kingma \& Welling, 2014）；World Models（Ha \& Schmidhuber, 2018）}
+\src{Kingma D P, Welling M. Auto-Encoding Variational Bayes. ICLR, 2014.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -171,17 +194,17 @@
 \begin{itemize}
     \item LeCun 的主张：不在像素层面预测未来，而在表征空间预测世界的下一步
     \item JEPA 只用相邻帧，预测下一帧的表征，不还原像素；目标由教师编码器给出，教师只做指数滑动平均，避免表征塌成常数
-    \item 编码器是视觉 Transformer：把图切成 6$\times$6 的小块，每块变成一个向量，称为一个 token，共 576 个；自注意力让每个 token 与所有 token 计算相关性，一次看到全图
+    \item 编码器是视觉 Transformer：图切成 6$\times$6 的小块，每块变成一个向量（token），共 576 个；自注意力让每个 token 与全部 token 计算相关性，一次看到全图
 \end{itemize}
 
 \vspace{0.15cm}
 \begin{center}
-\includegraphics[width=0.86\textwidth]{pic/jepa.png}
+\includegraphics[width=0.76\textwidth]{pic/jepa.png}
 
 {\scriptsize 上下文编码器、预测器与目标编码器。本文只取其中的编码器，6 层、192 维、0.29 M 参数。}
 \end{center}
 
-\src{LeCun, 2022；Ha \& Schmidhuber, 2018；Assran et al., 2023（I-JEPA）}
+\src{LeCun Y. A Path Towards Autonomous Machine Intelligence. OpenReview, 2022.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -216,7 +239,7 @@ JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
     \item 容量：ResNet18 有 11.2 M 参数，JEPA 编码器只有 0.29 M
 \end{itemize}}
 
-\src{He et al., 2016；Dosovitskiy et al., 2021；Kingma \& Welling, 2014；LeCun, 2022}
+\src{Dosovitskiy A, Beyer L, Kolesnikov A, et al. An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale. ICLR, 2021.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -250,7 +273,7 @@ JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
 \vspace{0.1cm}
 {\small 方向也一致：6 至 9 米的中位偏差是 $+0.60$ 米，79\% 的帧把障碍读远。读远意味着不触发。}
 
-\src{Eigen et al., 2014（$\delta_1$ 与 AbsRel 的定义）；Godard et al., 2019}
+\src{Eigen D, Puhrsch C, Fergus R. Depth Map Prediction from a Single Image using a Multi-Scale Deep Network. NIPS, 2014.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -283,7 +306,7 @@ JEPA & 0.847 & 88.1\% & 57 \\
 \vspace{0.05cm}
 {\scriptsize 识别率：该触发时确实触发的比例。漏判：该触发却没触发。$\delta_1$ 最高的模型漏判最多，名义 9 米只守 8.4 米。}
 
-\src{ISO 15964:2025；GB 42590-2023（判据取值）；Eigen et al., 2014}
+\src{ISO 15964:2025. Detection and avoidance systems for uncrewed aircraft systems. ISO, 2025.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -298,7 +321,7 @@ JEPA & 0.847 & 88.1\% & 57 \\
 \vspace{0.3cm}
 本章要处理两件事：误差分布如何进入界面，人的判断如何回到训练数据。前者是呈现问题，后者是流程问题。
 
-\src{Parasuraman \& Riley, 1997；Endsley \& Kiris, 1995}
+\src{Parasuraman R, Riley V. Humans and Automation: Use, Misuse, Disuse, Abuse. Human Factors, 1997.}
 \end{frame}
 
 \begin{frame}{从误差分布到界面规则}
@@ -321,7 +344,7 @@ JEPA & 0.847 & 88.1\% & 57 \\
 \vspace{0.1cm}
 {\small 系统在近处不可靠，这一事实目前只存在于实验报告，尚未进入界面，而使用者的平均印象恰好覆盖了最危险的区间。}
 
-\src{Parasuraman \& Riley, 1997；Endsley \& Kiris, 1995}
+\src{Parasuraman R, Riley V. Humans and Automation: Use, Misuse, Disuse, Abuse. Human Factors, 1997.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -339,7 +362,7 @@ Chen 等提出的 OpenValue 已把这条链路工程化：模型在可配置场�
 \vspace{0.15cm}
 {\small 两者对象不同，机制相同。本文只接通第三环，效果尚未验证。}
 
-\src{Bainbridge, 1983；Parasuraman \& Riley, 1997；Chen et al., 2026（OpenValue）}
+\src{Chen L, Tong M, Zhang Z, et al. OpenValue: A Participatory Governance Infrastructure for AI Value Formation. Preprint, 2026.}
 \end{frame}
 
 %--------------------------------------------------------------
@@ -354,10 +377,29 @@ Chen 等提出的 OpenValue 已把这条链路工程化：模型在可配置场�
 \vspace{0.3cm}
 \textbf{限制}：无容量对齐的对照，ResNet18 比 JEPA 大近四十倍；数据全部来自仿真，真机迁移未验证；复核闭环只接通，效果未评估。
 
-\src{LeCun, 2022；ISO 15964:2025}
+\src{LeCun Y. A Path Towards Autonomous Machine Intelligence. OpenReview, 2022.}
 \end{frame}
 
 %--------------------------------------------------------------
+\begin{frame}{参考文献}
+
+{\scriptsize
+\begin{itemize}
+    \item Ranftl R, Bochkovskiy A, Koltun V. Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer. TPAMI, 2020.
+    \item ISO 15964:2025. Detection and avoidance systems for uncrewed aircraft systems. ISO, 2025.
+    \item Shah S, Dey D, Lovett C, Kapoor A. AirSim: High-Fidelity Visual and Physical Simulation for Autonomous Vehicles. FSR, 2017.
+    \item LeCun Y, Bottou L, Bengio Y, Haffner P. Gradient-Based Learning Applied to Document Recognition. Proceedings of the IEEE, 1998.
+    \item He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.
+    \item Kingma D P, Welling M. Auto-Encoding Variational Bayes. ICLR, 2014.
+    \item LeCun Y. A Path Towards Autonomous Machine Intelligence. OpenReview, 2022.
+    \item Dosovitskiy A, Beyer L, Kolesnikov A, et al. An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale. ICLR, 2021.
+    \item Eigen D, Puhrsch C, Fergus R. Depth Map Prediction from a Single Image using a Multi-Scale Deep Network. NIPS, 2014.
+    \item Parasuraman R, Riley V. Humans and Automation: Use, Misuse, Disuse, Abuse. Human Factors, 1997.
+    \item Chen L, Tong M, Zhang Z, et al. OpenValue: A Participatory Governance Infrastructure for AI Value Formation. Preprint, 2026.
+\end{itemize}}
+
+\end{frame}
+
 \begin{frame}{}
     \centering
     \vspace{2cm}
