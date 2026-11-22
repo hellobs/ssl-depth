@@ -13,7 +13,9 @@
 \usepackage{fourier}
 \usepackage{hyperref}
 
-\author[张子睿等]{张子睿 \quad 盛祺 \quad 刘子瑄 \quad 马婧怡}
+\author[张子睿等]{%
+张子睿$^{1}$\quad 盛祺$^{2}$\quad 刘子瑄$^{3}$\quad 马婧怡$^{4}$\\[3pt]
+{\scriptsize $^{1}$设计学院\quad $^{2}$自动化科学与工程学院\quad $^{3}$电子商务系\quad $^{4}$材料科学与工程学院}}
 \title[基于人工智能的无人机单目深度测距]{基于人工智能的无人机单目深度测距：\\ 误差研究与设计学分析}
 \institute{
     华南理工大学 \\
@@ -52,12 +54,10 @@
 
 \begin{frame}
     \titlepage
-    \vspace*{-0.8cm}
-    \begin{figure}[htpb]
-        \begin{center}
-            \includegraphics[height=2.1cm]{pic/scut-logo.png}
-        \end{center}
-    \end{figure}
+    \begin{tikzpicture}[remember picture, overlay]
+        \node[anchor=south east, xshift=-0.8cm, yshift=0.95cm] at (current page.south east)
+            {\includegraphics[height=1.5cm]{pic/scut-logo.png}};
+    \end{tikzpicture}
 \end{frame}
 
 %--------------------------------------------------------------
