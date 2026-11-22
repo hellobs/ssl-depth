@@ -73,10 +73,8 @@
 \end{itemize}
 
 \vspace{0.2cm}
-\textbf{相对深度}只要求顺序，允许整体缩放。\textbf{米制深度}直接给米数。无人机要判断九米以内有没有障碍，只能要后者。
+\textbf{相对深度}只要求顺序，允许整体缩放。\textbf{米制深度}要给米数，可照片里没有米：把楼房、车、地面连同间距以光心等比放大，成像完全不变。尺度只能从外部来，本文用渲染引擎输出的深度真值。无人机判断九米以内有没有障碍，只能要米制。
 
-\vspace{0.1cm}
-{\small 标签取\textbf{视差} $1/d$，即距离的倒数。倒过来之后近处差异被放大，而近处正是避障关心的区间。}
 
 \src{Ranftl R, Bochkovskiy A, Koltun V. Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer. TPAMI, 2020.}
 \end{frame}
@@ -124,6 +122,7 @@
     \item 采集 422 个航段、75,194 帧；按深度范围 0.5 至 80 米、帧有效率 50\% 清洗，保留 48,767 帧
     \item 真值由渲染引擎直接输出，与图像逐像素对齐，单位是米
     \item 划分按航段切：训练 375 段、验证 14 段、测试 15 段，留出集 3,326 帧
+    \item 训练标签取\textbf{视差} $1/d$，即距离的倒数，近处差异被放大
 \end{itemize}
 
 \vspace{0.3cm}
