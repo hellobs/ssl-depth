@@ -29,6 +29,7 @@ from task_metric import CACHE, ROOT, build, collect  # noqa: E402
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--backbone", default="imagenet")
     ap.add_argument("--run", default="runs/v4_imagenet")
     ap.add_argument("--index", default=None)
     ap.add_argument("--split-file", default=None)
@@ -39,7 +40,7 @@ def main():
     sp = json.loads(sp_path.read_text(encoding="utf-8"))["split"]
     eps = sorted(set(sp["val"]) | set(sp["test"]))
 
-    bb, head, dev = build("imagenet", a.run)
+    bb, head, dev = build(a.backbone, a.run)
     g, p = collect(bb, head, dev, idx, eps)
     ok = np.isfinite(g) & np.isfinite(p)
     g, p = g[ok], p[ok]

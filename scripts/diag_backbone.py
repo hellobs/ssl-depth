@@ -84,6 +84,8 @@ CKPTS = {
     "jepa_domain_v6": Path(f"{REPO}/runs/jepa_domain_v6/jepa.pt"),
     # v7：训练语料 375 航段 / 43,271 帧，val/test 与 v5 完全一致
     "jepa_domain_v7": Path(f"{REPO}/runs/jepa_domain_v7/jepa.pt"),
+    # 2018 World Models 的视觉编码器：在 375 训练航段上重训，未看留出集
+    "vae2018": Path("D:/zzr/wmdata/vae_runs/v7_vae/best_final.pt"),
 }
 
 # 与 jepa.pt 完全一致的模型配置（从 ckpt 里读出来后写死，避免依赖加载顺序）
@@ -134,9 +136,17 @@ def load_split(idx: dict, split_path: Path | None = None):
 
 
 class Frames(Dataset):
-    def __init__(self, idx: dict, episodes: list[str], items=None):
+    """监督目标固定 108x192；输入图像的分辨率可按骨干指定。
+
+    VAE 在 96x96 上训练，喂 108x192 属于分布外，因此单独给它 96x96。
+    真值始终在 108x192 上算，所以各行的 δ1 仍是同一批像素。
+    """
+
+    def __init__(self, idx: dict, episodes: list[str], items=None,
+                 in_h: int = IMG_H, in_w: int = IMG_W):
         self.items = list(items) if items is not None else \
             [(e, s) for e in episodes for s in idx["kept"][e]]
+        self.in_h, self.in_w = in_h, in_w
 
     def __len__(self):
         return len(self.items)
@@ -146,7 +156,7 @@ class Frames(Dataset):
         run, episode = ep.split("/")
         obs = find_obs(run, episode)
         bgr = cv2.imread(str(obs / f"{stem}_front_rgb.png"), cv2.IMREAD_COLOR)
-        rgb = cv2.cvtColor(cv2.resize(bgr, (IMG_W, IMG_H), interpolation=cv2.INTER_AREA),
+        rgb = cv2.cvtColor(cv2.resize(bgr, (self.in_w, self.in_h), interpolation=cv2.INTER_AREA),
                            cv2.COLOR_BGR2RGB).astype(np.float32) / 127.5 - 1.0
         dep = np.load(obs / f"{stem}_front_depth.npy").astype(np.float32)
         val = np.load(obs / f"{stem}_front_depth_valid.npy").astype(bool)
@@ -161,7 +171,12 @@ class Frames(Dataset):
 
 
 class DepthHead(nn.Module):
-    """任意 token 网格 -> 108x192 视差图。三组共用，容量一致。"""
+    """任意 token 网格 -> 108x192 视差图。所有骨干共用同一串卷积与容量。
+
+    入口不做重采样：各骨干按自己的网格进入，上采样倍率随网格自适应。
+    网格密度不是限制因素——ResNet 的 4x6 比 JEPA 的 18x32 粗十六倍，
+    测试集 δ1 反而高 0.028（0.875 对 0.847）。
+    """
 
     def __init__(self, dim: int = 192):
         super().__init__()
@@ -181,6 +196,54 @@ class DepthHead(nn.Module):
         x = self.up4(F.interpolate(x, size=(th * 4, tw * 4), mode="bilinear", align_corners=False))
         x = self.upf(F.interpolate(x, size=(IMG_H, IMG_W), mode="bilinear", align_corners=False))
         return self.out(x)
+
+
+class VaeBackbone(nn.Module):
+    """2018 World Models 的视觉编码器（VAE）。
+
+    只取编码器：latent 均值向量当作表征，投影到 192 维接同一个 DepthHead。
+    VAE 的 latent 在 96x96 输入下是 6x6，比 JEPA 的 18x32 粗得多，
+    这是该路线本身的性质，不是实现取舍。
+    """
+
+    def __init__(self, ckpt: Path, finetune: bool = False):
+        super().__init__()
+        import sys as _sys
+        _sys.path.insert(0, str(Path(f"{MICROW}/../Airsim-WorldModelCollector/vae")))
+        from train_vae import VAE
+        ck = torch.load(ckpt, map_location="cpu", weights_only=False)
+        a = ck["args"]
+        full = VAE(a["latent"], 3, a["size"], a.get("width", 1))
+        full.load_state_dict(ck["state_dict"])
+        self.enc = full.encoder
+        self.proj = nn.Conv2d(a["latent"], 192, 1)
+        self.finetune = finetune
+        for p in self.enc.parameters():
+            p.requires_grad_(finetune)
+        if not finetune:
+            self.enc.eval()
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if not self.finetune:
+            self.enc.eval()          # 冻结时 BN/IN 一律不进训练态
+        return self
+
+    def trainable(self):
+        return list(self.proj.parameters())
+
+    def finetune_params(self):
+        return list(self.enc.parameters()) if self.finetune else []
+
+    def forward(self, x):
+        x = x[:, 0]
+        if self.finetune:
+            feat = self.enc(x)
+        else:
+            with torch.no_grad():
+                feat = self.enc(x)      # (B, latent, h/16, w/16) 的卷积特征图
+        z = self.proj(feat)
+        return z.flatten(2).transpose(1, 2), z.shape[-2], z.shape[-1]
 
 
 class JepaBackbone(nn.Module):
@@ -230,23 +293,29 @@ class ResnetBackbone(nn.Module):
     MEAN = (0.485, 0.456, 0.406)
     STD = (0.229, 0.224, 0.225)
 
-    def __init__(self, pretrained: bool = True):
+    def __init__(self, pretrained: bool = True, finetune: bool = False):
         super().__init__()
         from torchvision.models import resnet18, ResNet18_Weights
         w = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
         r = resnet18(weights=w)
         self.body = nn.Sequential(*list(r.children())[:-2])   # -> [B,512,h,w]
         self.proj = nn.Conv2d(512, 192, 1)
+        self.finetune = finetune
         for p in self.body.parameters():
-            p.requires_grad_(False)
-        self.body.eval()
+            p.requires_grad_(finetune)
+        if not finetune:
+            self.body.eval()
         self.register_buffer("mean", torch.tensor(self.MEAN).view(1, 3, 1, 1))
         self.register_buffer("std", torch.tensor(self.STD).view(1, 3, 1, 1))
 
     def train(self, mode: bool = True):
         super().train(mode)
-        self.body.eval()
+        if not self.finetune:
+            self.body.eval()
         return self
+
+    def finetune_params(self):
+        return list(self.body.parameters()) if self.finetune else []
 
     def trainable(self):
         return list(self.proj.parameters())
@@ -302,7 +371,7 @@ def main():
     ap.add_argument("--backbone", required=True,
                     choices=["scratch", "jepa", "jepa_domain", "jepa_domain_v5",
                              "jepa_domain_v5_g4", "jepa_domain_v6", "jepa_domain_v7",
-                             "imagenet", "resnet_scratch"])
+                             "vae2018", "imagenet", "resnet_scratch"])
     ap.add_argument("--epochs", type=int, default=15)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--workers", type=int, default=4,
@@ -311,6 +380,8 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default="cuda", choices=["cuda", "cpu"],
                     help="cpu 时不碰显卡；训练速度约慢一个数量级")
+    ap.add_argument("--finetune", action="store_true",
+                    help="解冻编码器端到端训练（低一档学习率）；默认冻结，只训头")
     ap.add_argument("--label-ratio", type=float, default=1.0,
                     help="训练集保留多少帧，用于标签效率扫描")
     ap.add_argument("--out-name", default=None,
@@ -333,20 +404,28 @@ def main():
              sum(len(idx["kept"][e]) for e in va), len(te),
              sum(len(idx["kept"][e]) for e in te)), flush=True)
 
-    if a.backbone in ("imagenet", "resnet_scratch"):
+    if a.backbone == "vae2018":
+        bb = VaeBackbone(CKPTS["vae2018"], finetune=a.finetune).to(dev)
+        print("  VAE latent 网格 %dx%d" % (bb.tok_h, bb.tok_w) if hasattr(bb, "tok_h") else "  VAE 编码器已加载", flush=True)
+    elif a.backbone in ("imagenet", "resnet_scratch"):
         # resnet_scratch 与 imagenet 只差权重本身，用来把卷积归纳偏置与预训练分开
-        bb = ResnetBackbone(a.backbone == "imagenet").to(dev)
+        bb = ResnetBackbone(a.backbone == "imagenet", finetune=a.finetune).to(dev)
     else:
         bb = JepaBackbone(None if a.backbone == "scratch" else CKPTS[a.backbone]).to(dev)
         print("  tokens %dx%d = %d" % (bb.tok_h, bb.tok_w, bb.tok_h * bb.tok_w), flush=True)
     head = DepthHead(192).to(dev)
 
-    dl_tr = DataLoader(Frames(idx, tr), batch_size=a.batch, shuffle=True,
-                       num_workers=a.workers, pin_memory=(dev == "cuda"), drop_last=True)
-    dl_va = DataLoader(Frames(idx, va), batch_size=a.batch, num_workers=a.workers,
-                       pin_memory=(dev == "cuda"))
-    dl_te = DataLoader(Frames(idx, te), batch_size=a.batch, num_workers=a.workers,
-                       pin_memory=(dev == "cuda"))
+    # 输入分辨率按骨干自己的训练分辨率给，不做统一；真值始终在 108x192 上算
+    in_h, in_w = (96, 96) if a.backbone == "vae2018" else (IMG_H, IMG_W)
+    print("  输入 %dx%d，监督目标 %dx%d" % (in_w, in_h, IMG_W, IMG_H), flush=True)
+
+    dl_tr = DataLoader(Frames(idx, tr, in_h=in_h, in_w=in_w), batch_size=a.batch,
+                       shuffle=True, num_workers=a.workers,
+                       pin_memory=(dev == "cuda"), drop_last=True)
+    dl_va = DataLoader(Frames(idx, va, in_h=in_h, in_w=in_w), batch_size=a.batch,
+                       num_workers=a.workers, pin_memory=(dev == "cuda"))
+    dl_te = DataLoader(Frames(idx, te, in_h=in_h, in_w=in_w), batch_size=a.batch,
+                       num_workers=a.workers, pin_memory=(dev == "cuda"))
 
     # 标签效率：只抽训练帧，val/test 不动。所有比例看同样多的样本（固定步数），
     # 否则少标签时 epochs 变少会与「标签少」这个变量混在一起。
@@ -365,11 +444,19 @@ def main():
           % (100 * a.label_ratio, len(pick), n_full, spe, a.epochs), flush=True)
 
     params = list(head.parameters()) + bb.trainable()
+    ft = bb.finetune_params() if hasattr(bb, "finetune_params") else []
     print("  trainable: %.2fM (head %.2fM + 投影 %.2fM)"
           % (sum(p.numel() for p in params) / 1e6,
              sum(p.numel() for p in head.parameters()) / 1e6,
              sum(p.numel() for p in bb.trainable()) / 1e6), flush=True)
-    opt = torch.optim.AdamW(params, lr=a.lr, weight_decay=0.01)
+    if ft:
+        print("  端到端：编码器 %d 个参数组，学习率 %.1e（头 %.1e）"
+              % (len(ft), a.lr * 0.1, a.lr), flush=True)
+        opt = torch.optim.AdamW(
+            [{"params": params, "lr": a.lr},
+             {"params": ft, "lr": a.lr * 0.1}], weight_decay=0.01)
+    else:
+        opt = torch.optim.AdamW(params, lr=a.lr, weight_decay=0.01)
     sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, a.epochs * len(dl_tr)))
 
     best = None

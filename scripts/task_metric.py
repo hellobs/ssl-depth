@@ -52,6 +52,9 @@ def build(backbone: str, run_dir: str):
     torch.manual_seed(seed)
     if backbone in ("imagenet", "resnet_scratch"):
         bb = ResnetBackbone(backbone == "imagenet").to(dev)
+    elif backbone == "vae2018":
+        from diag_backbone import CKPTS, VaeBackbone
+        bb = VaeBackbone(CKPTS["vae2018"]).to(dev)
     else:
         from diag_backbone import CKPTS
         bb = JepaBackbone(None if backbone == "scratch" else CKPTS[backbone]).to(dev)
@@ -127,7 +130,8 @@ def main():
                               ("imagenet", "runs/v7_imagenet"),
                               ("resnet_scratch", "runs/v7_resnet_scratch"),
                               ("scratch", "runs/v7_scratch"),
-                              ("jepa_domain_v7", "runs/v7_jepa_domain_v7")]:
+                              ("jepa_domain_v7", "runs/v7_jepa_domain_v7"),
+                              ("vae2018", "runs/v7_vae2018")]:
         if only and backbone not in only:
             continue
         if a.only_run and a.only_run not in run_dir:

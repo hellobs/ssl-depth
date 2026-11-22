@@ -50,7 +50,7 @@ $^{3}$lsean0713503@163.com\quad $^{4}$857270572@qq.com}
 
 \noindent{\bfseries 摘\quad 要：}低空经济正在加速布局，无人机配送的规模化运营已成趋势。安全取决于飞行器能否拿到可用的世界表征。LeCun 把自主智能的核心归结为世界模型：系统在学到的表征空间里预测状态的下一步，而不是重建像素。本文沿这条路线，在城市配送避障这一窄任务上做了一次检验。四类视觉表征在同一协议下对照，其中域内自监督的 MicroJEPA 用来检验世界模型这条路线。
 
-团队在 Unreal Engine 驱动的 AirSim 平台的城市峡谷场景采集了 422 个可用航段、75194 帧图像与稠密深度真值，清洗后保留 48767 帧，以其中 375 个航段训练、29 个航段留出评测。四类表征在同一协议下对照。分层结果与常识相反：误差集中在 10 米以内，0 至 10 米一档 $\delta_1$ 为 0.732，而 10 米以外稳定在 0.87。失效仍有一个方向：6 米以内中位偏差 $+1.02$ 米，模型系统性地把近处读远。决策级上出现第二次分叉：$\delta_1$ 最高的 ImageNet 在 9 米判据上只识别出 72.3\%，$\delta_1$ 低 0.032 的 MicroJEPA 反而识别出 88.1\%。
+团队在 Unreal Engine 驱动的 AirSim 平台的城市峡谷场景采集了 422 个可用航段、75194 帧图像与稠密深度真值，清洗后保留 48767 帧，以其中 375 个航段训练、29 个航段留出评测。四类表征在同一协议下对照。分层结果与常识相反：误差集中在 10 米以内，0 至 10 米一档 $\delta_1$ 为 0.732，而 10 米以外稳定在 0.87。失效仍有一个方向：6 米以内中位偏差 $+1.02$ 米，模型系统性地把近处读远。决策级上出现第二次分叉：$\delta_1$ 最高的 ResNet18 在 9 米判据上只识别出 82.9\%，$\delta_1$ 只有 0.467 的变分自编码器反而识别出 89.4\%。
 
 上述分布对人机协作有直接含义。系统在特定区间显著不可靠，且偏差朝向更远，以同等确定性传达每一次判断就会掩盖这种差异。本文因此构想 Human in the loop 机制：让评审者在每一次触发时留下可追溯的判断，再把这些判断聚合回训练数据。判断经溯源、评判与聚合三个环节，转化为下一版模型的训练数据。
 
@@ -62,7 +62,7 @@ $^{3}$lsean0713503@163.com\quad $^{4}$857270572@qq.com}
 
 \noindent{\bfseries Abstract:} Delivery drones are moving into routine operation, and safety now hinges on whether the aircraft can build a usable representation of the world. LeCun places the world model at the centre of autonomous intelligence: rather than reconstructing pixels, the system predicts the next state in a learned representation space. This paper follows that route and puts it to one test, obstacle avoidance in urban delivery. Four frozen representations are compared under a single protocol; among them, a domain-self-supervised MicroJEPA serves as the test of the world-model route itself.
 
-The team collected 422 usable segments and 75,194 frames with dense depth ground truth in an urban canyon built on the Unreal Engine-driven AirSim platform; cleaning retained 48,767 frames, of which 375 segments were used for training and 29 held out. Four representations were compared under one protocol. Error is not spread evenly: it concentrates within 10 m, where $\delta_1$ falls to 0.732 while holding at 0.87 beyond 10 m, and it points in one direction, with a median bias of $+1.02$ m inside 6 m, near obstacles read as farther than they are. The ranking splits a second time at the decision level: ImageNet, which leads on $\delta_1$, recognises only 72.3\% of the frames inside the 9 m criterion, while MicroJEPA, 0.032 lower on $\delta_1$, recognises 88.1\%.
+The team collected 422 usable segments and 75,194 frames with dense depth ground truth in an urban canyon built on the Unreal Engine-driven AirSim platform; cleaning retained 48,767 frames, of which 375 segments were used for training and 29 held out. Four representations were compared under one protocol. Error is not spread evenly: it concentrates within 10 m, where $\delta_1$ falls to 0.732 while holding at 0.87 beyond 10 m, and it points in one direction, with a median bias of $+1.02$ m inside 6 m, near obstacles read as farther than they are. The ranking splits a second time at the decision level: ResNet18, which leads on $\delta_1$, recognises only 82.9\% of the frames inside the 9 m criterion, while the variational autoencoder, at $\delta_1$ 0.467, recognises 89.4\%.
 
 This distribution has a direct bearing on human-machine collaboration. When the system is markedly unreliable inside a specific interval and always errs in the same direction, conveying every judgement with equal confidence hides exactly those cases. The paper therefore proposes a human-in-the-loop mechanism: reviewers leave a traceable judgement at every trigger, and those judgements are aggregated back into training data. Each judgement passes through provenance, review and aggregation to become training data for the next model.
 
@@ -88,7 +88,7 @@ This distribution has a direct bearing on human-machine collaboration. When the 
 
 要判断阈值，先要有表征。表征从哪来，是这条链条上的第一个技术选择。LeCun 把自主智能的核心称作世界模型：系统不直接拟合从感知到动作的映射，而是在学到的表征空间里预测下一状态，再据此规划\cite{lecun}。这个框架把自监督预训练从省标注的训练技巧，提升为智能体获取世界知识的途径，也给出了本文的技术主线：先在域内学表征，再看表征能否兑现成米制距离。
 
-本文的 JEPA 模型用来检验这条主线。它只看相邻帧，在表征空间预测，不读深度答案。第 \ref{sec:impl} 章把它与随机初始化、ImageNet 预训练放在同一条件下比较，回答一个具体问题：世界模型学到的表征在米制测距上能兑现多少。
+本文的 JEPA 模型用来检验这条主线。它只看相邻帧，在表征空间预测，不读深度答案。第 \ref{sec:impl} 章把它与随机初始化的卷积网络、视觉 Transformer、以及另一种域内自监督表征放在同一条件下比较，回答一个具体问题：世界模型学到的表征在米制测距上能兑现多少。
 
 链条的两端才是本文的对象。输入端是模型：它能否可靠地识别阈值，在哪些条件下会失准。输出端是人：阈值判定之后，全过程是否可溯源、管理者能否观测并评判，评判结果能否沉淀为下一版模型的训练数据。
 
@@ -118,7 +118,11 @@ MiDaS 较早解决了跨数据集通用的问题：混合多个来源的深度�
 
 自监督是另一类方案。Monodepth2 用相邻帧的视图合成构造损失，深度正确则重建误差小\cite{monodepth2}。它在纹理丰富、光照稳定的场景有效，在天空、玻璃与无纹理墙面失效。针对这两个失效源已有专门的基准。Liang 等发布玻璃幕墙深度数据集，用上下文线索修正玻璃区域的偏差\cite{glasswall}；同一团队又采集多光照条件下的室内 RGB-D 数据，缓解光照变化引起的域偏移\cite{mil}。处理的是真实图像上的失效源；本文处理的是仿真到部署之间的表征选择，两者互补。
 
-这些工作在评测上有一个共同点：报告尺度对齐之后的相对误差。该标准适合比较算法本身，但会掩盖系统性偏差。工程系统需要的是以米为单位的绝对距离。
+生成式路线是第三类。Marigold 复用 Stable Diffusion 的 VAE 与扩散过程，把深度当作图像生成的一个特例，只用合成数据微调就能零样本迁移到真实场景\cite{marigold}。它把 VAE 当作 latent 空间的压缩器，VAE 本身不是被测对象。WorDepth 反过来把变分推断用在深度上：文本描述编码成隐分布，采样后解码成米制深度图\cite{wordepth}。JEPADepth 把 I-JEPA 的掩码预测损失当作正则项加进自监督深度训练，在 KITTI 上把 $\delta_1$ 从 0.891 提到 0.898\cite{jepadepth}。
+
+三者的共同点是编码器与深度头联合训练，深度信号会改造表征。本文的做法不同：先把表征训练好并冻结，再只训一个共用的解码头，测的是表征里还剩多少可解码的深度信息，而不是端到端能练出多少。这个区别决定了本文的结果不能与上列工作直接比大小。
+
+这些工作在评测上还有一个共同点：报告尺度对齐之后的相对误差。该标准适合比较算法本身，但会掩盖系统性偏差。工程系统需要的是以米为单位的绝对距离。
 
 表征学习这条线在世界模型框架下的定位见第 \ref{sec:wm} 节，这里只留一句结论：Ha 与 Schmidhuber 把世界模型做成了可训练的系统，LeCun 把它推到自主智能的中心，主张在表征空间预测而不是重建像素。这个取舍对逐像素的米制深度估计是否有利，是一个经验问题，第 \ref{sec:compare} 节用同域对照回答。
 
@@ -316,64 +320,90 @@ $\delta_1$ 是最常用的深度精度指标，指预测值与真实值的比值
 
 划分按航段进行，不按帧随机划分，否则同一趟的相邻帧会同时进入训练与测试，指标会被高估。418 个航段进入实验：训练 375 段（43271 帧）、验证 14 段（1641 帧）、测试 15 段（1685 帧），留出集合计 3326 帧。
 
-\subsection{三条路径的对照}
+\subsection{两条路径的对照}
 \label{sec:compare}
 
 固定解码器、训练轮数、优化器与数据划分，只更换特征提取网络，得到表 \ref{tab:backbone}。特征提取网络的参数全部固定，只训练解码器，这样差异只能来自表征本身，不会混入不同网络的收敛速度差异。
 
-四行对应三条获得表征的路径。第一条从零学起：随机初始化的 ResNet18 与视觉 Transformer，只有数据，没有先验。第二条借通用先验：ImageNet 有监督预训练。第三条是本文的技术主线，在域内自己学表征：MicroJEPA 只看相邻帧，在表征空间预测，不读深度答案。表按假设强度排列，从完全没有先验，到借来的先验，再到自己学的先验。
+这套设置是一次探测。深度只由解码头学习，编码器不接收任何深度信号，因此四行比较的是各表征里还剩多少可被解码出来的深度信息，而不是四个模型各自能做到多准。
+
+四行对应两条获得表征的路径。前两行从零学起：随机初始化的 ResNet18 与视觉 Transformer，只有网络结构和随机权重，没有任何训练。后两行在域内自己学：变分自编码器在 RGB 上重建，MicroJEPA 只看相邻帧、在表征空间预测，两者都不读深度答案。表按表征的信息组织程度排列，从随机响应，到重建式压缩，再到预测式抽象。
 
 \begin{table}[H]
 \centering
 \small
-\caption{三条获得表征的路径}
+\caption{两条获得表征的路径，编码器全部固定，只训练同一个解码头}
 \label{tab:backbone}
 \begin{tabular}{llccc}
 \toprule
-特征提取网络 & 预训练数据 & 验证集 $\delta_1$ & 测试集 $\delta_1$ & 测试集 AbsRel \\
+特征提取网络 & 表征来源 & 验证集 $\delta_1$ & 测试集 $\delta_1$ & 测试集 AbsRel \\
 \midrule
-ResNet18 随机初始化 & 无 & 0.855 & 0.875 & 0.135 \\
-ViT 随机初始化 & 无 & 0.786 & 0.772 & 0.230 \\
-ImageNet ResNet18 & ImageNet 有监督 & 0.832 & \textbf{0.879} & \textbf{0.124} \\
-JEPA 自监督 & 本数据（世界模型） & \textbf{0.872} & 0.847 & 0.161 \\
+ResNet18 随机初始化 & 随机权重，未训练 & 0.855 & \textbf{0.875} & \textbf{0.135} \\
+ViT 随机初始化 & 随机权重，未训练 & 0.786 & 0.772 & 0.230 \\
+变分自编码器（VAE） & 本数据重建 & 0.554 & 0.467 & 0.566 \\
+JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-三条可以归因的效应。
+四行之间的差别可以拆成三件互不相同的事。
 
-架构效应。同为随机初始化，卷积网络比视觉 Transformer 高 0.069（验证集）至 0.103（测试集）。卷积的局部连接与平移等变先验，比全局注意力的归纳偏置更贴合逐像素回归。
+架构。同为随机权重，卷积网络比视觉 Transformer 高 0.069（验证集）至 0.103（测试集）。卷积的局部连接与平移等变，比全局注意力更贴合逐像素回归。
 
-预训练效应。同为卷积网络，加入 ImageNet 预训练在测试集上带来 0.004 的提升，绝对相对误差从 0.135 降到 0.124。四万帧的训练集已经把两者拉到同一水平，通用预训练在这条窄任务上的边际收益接近消失。
+信息组织方式。VAE 与 JEPA 都在本数据上自学，不读深度，差别在目标：一个要重建像素，一个要预测下一帧的表征。测试集 $\delta_1$ 差了 0.380。重建目标把画面压进 6$\times$6 的 latent，空间定位在压缩里丢掉了；预测目标保留了 18$\times$32 个 token，位置信息还在。同样的语料、同样的编码器规模量级，目标不同，可解码的深度差了将近一倍。
 
-自监督效应。MicroJEPA 在本数据上自监督之后，测试集 $\delta_1$ 从 0.772 升到 0.847，绝对相对误差从 0.230 降到 0.161，说明同域语料确实把表征拉向了这个任务。预训练只用航段内的相邻帧对，不读深度，语料按航段级切分，限定为不含任何验证与测试航段的 375 个航段。它的验证集 $\delta_1$ 是四行里最高的 0.872，但测试集掉到 0.847，低于两个卷积网络。域内自监督确实学到了东西，但验证集高估了它对未见航段的适应能力。
+容量。ResNet18 有 11.2 M 参数，JEPA 编码器 0.29 M，两者相差近四十倍。ResNet 那一行的 $\delta_1$ 最高，不能全归给卷积先验；它给出的特征图本来就是四行里最宽的。表里没有容量对齐的对照，这一点在结论里作为限制保留。
+
+\subsection{编码器解冻之后}
+\label{sec:finetune}
+
+上面的四行都把编码器锁死。若把编码器一起解冻、让深度梯度回传到最前面，结果与直觉不符：
+
+\begin{table}[H]
+\centering
+\small
+\caption{解冻编码器前后的测试集 $\delta_1$（其余设置不变，同为 15 轮）}
+\label{tab:finetune}
+\begin{tabular}{lccc}
+\toprule
+特征提取网络 & 固定编码器 & 联合训练 & 变化 \\
+\midrule
+ResNet18 & 0.875 & 0.677 & $-0.198$ \\
+变分自编码器（VAE） & 0.467 & 0.562 & $+0.095$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ResNet18 变差，VAE 变好。差别在起点：随机卷积特征本身已经是一组可用的边缘与纹理响应，解冻之后编码器朝深度损失移动，15 轮走不远，却足以把这组基搅乱；VAE 的 latent 本来就粗，解冻给了它一次重新组织的机会。
+
+这条结果有一个前提必须写明：15 轮不是端到端训练的收敛预算。从随机权重训练一个 ResNet18 通常需要五十轮以上，因此 0.677 不代表联合训练的上限，只代表在这套短预算下，固定随机特征反而是更稳的做法。表 \ref{tab:finetune} 因此作为对照，不进主表。
 
 \subsection{误差的分布}
 \label{sec:errdist}
 
-把预测深度换算成米制距离，四组模型对前方最近障碍的中位估计落在 16.7 至 17.6 米之间，真值 17.1 米，最大偏差 2.8\%，没有一组在尺度上出错。四组的偏差方向并不一致：ViT 随机是 $-2.0$\%，JEPA 是 $+2.8$\%。差距不在尺度，在逐像素精度：ImageNet 与随机卷积的尺度几乎相同，绝对相对误差却是 0.124 对 0.135。表 \ref{tab:distance} 按真值距离把留出集分成四档。
+把预测深度换算成米制距离，四组模型对前方最近障碍的中位估计落在 16.7 至 17.6 米之间，真值 17.1 米，最大偏差 3.1\%，没有一组在尺度上出错。四组的偏差方向并不一致：ViT 随机是 $-2.0$\%，ResNet18 是 $+2.3$\%，VAE 是 $+3.1$\%。差距不在尺度，在逐像素精度。表 \ref{tab:distance} 以 ResNet18 为例，按真值距离把留出集分成四档。
 
 \begin{table}[H]
 \centering
-\caption{按真值中位距离分档的误差分布（留出集 3326 帧）}
+\caption{按真值中位距离分档的误差分布（ResNet18，留出集 3326 帧）}
 \label{tab:distance}
 \begin{tabular}{lccccc}
 \toprule
 距离区间 & 帧数 & 绝对相对误差 & $\delta_1$ & RMSE（米） & $\delta_1<0.5$ 占比 \\
 \midrule
-0 至 10 米 & 408 & 0.403 & \textbf{0.732} & 8.45 & \textbf{16\%} \\
-10 至 20 米 & 1157 & 0.131 & 0.868 & 6.49 & 0.0\% \\
-20 至 40 米 & 1055 & 0.103 & \textbf{0.892} & 6.06 & 2\% \\
-40 至 80 米 & 706 & 0.114 & \textbf{0.873} & 7.23 & 0.4\% \\
+0 至 10 米 & 408 & 0.361 & \textbf{0.692} & 9.31 & \textbf{18\%} \\
+10 至 20 米 & 1157 & 0.114 & 0.904 & 5.50 & 1\% \\
+20 至 40 米 & 1055 & 0.098 & \textbf{0.884} & 5.48 & 7\% \\
+40 至 80 米 & 706 & 0.101 & \textbf{0.884} & 6.64 & 1\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-误差不是均匀分布的。0 至 10 米一档的 $\delta_1$ 为 0.732，10 米以外稳定在 0.87 以上。这一档只占留出集的 12\%，却是避障最要紧的区间；它的绝对相对误差是第二档的 3.1 倍，16\% 的帧 $\delta_1$ 低于 0.5，整帧几乎不可用。
+误差不是均匀分布的。0 至 10 米一档的 $\delta_1$ 为 0.692，10 至 20 米升到 0.904。这一档只占留出集的 12\%，却是避障最要紧的区间；它的绝对相对误差是第二档的 3.2 倍，18\% 的帧 $\delta_1$ 低于 0.5。
 
-方向也一致。6 至 9 米区间的中位偏差是 $+1.01$ 米，0 至 6 米是 $+1.02$ 米，77\% 的帧把障碍读远，23\% 读远超过 2 米。这个方向与语料的构成有关：全部数据里 25 至 35 米占 69\%，近场只占 6\%，模型因此把先验放在了更远的一侧。
+方向也一致。6 至 9 米区间的中位偏差是 $+0.60$ 米，0 至 6 米是 $+1.08$ 米，79\% 的帧把障碍读远，14\% 读远超过 2 米。这个方向与语料的构成有关：全部数据里 25 至 35 米占 69\%，近场只占 6\%，模型因此把先验放在了更远的一侧。
 
-场景之间的差异比这更大。误差最低的航段在 0.060 附近，最高的接近 0.467，中位 0.111，同一批权重换一段航线就差七倍，而模型之间 $\delta_1$ 的最大差距只有 0.107。评估一个模型能不能用，应当看最差场景，而不是平均值。
+场景之间的差异比这更大。误差最低的航段在 0.036，最高的接近 0.475，中位 0.237，同一批权重换一段航线就差一个数量级，而四行之间 $\delta_1$ 的最大差距是 0.408。评估一个模型能不能用，应当看最差场景，而不是平均值。
 
 \subsection{误差对避障意味着什么}
 \label{sec:decision}
@@ -396,23 +426,42 @@ R = \frac{N_{\mathrm{TP}}}{N_{\mathrm{TP}} + N_{\mathrm{FN}}}
 \label{eq:recall}
 \end{equation}
 
-识别率单独看会误导，两个方向都会。四组模型在 9 米判据上的识别率从 74.0\% 到 84.0\%，跨度只有十个百分点；误触发却从 7 帧到 100 帧，差十四倍。JEPA 与 ViT 随机偏向多报，ImageNet 与随机卷积偏向少报。同一批画面，两种偏置，没有哪一种在两种误差上都占优。
-
-所以单一阈值上的识别率不能用来排序模型，$\delta_1$ 也不能。两个指标指向相反的失效模式，选哪个取决于任务更怕漏判还是更怕误刹。避障场景下，漏判意味着撞上，误刹意味着停机检查，前者不可逆，因此这里偏向召回。表 \ref{tab:task} 列出五个阈值下的判定结果。
+四组模型在 9 米判据上的表现列在表 \ref{tab:nine}。识别率从 82.9\% 到 89.4\%，跨度六个百分点；误触发从 23 帧到 61 帧，差两倍多。
 
 \begin{table}[H]
 \centering
-\caption{不同碰撞阈值下的决策结果（ImageNet 预训练，留出集 3326 帧）}
+\small
+\caption{四组模型在 9 米判据上的判定（留出集 3326 帧，该触发 480 帧）}
+\label{tab:nine}
+\begin{tabular}{lccccc}
+\toprule
+特征提取网络 & 该触发且触发 & 漏判 & 误触发 & 识别率 & 精确率 \\
+\midrule
+ResNet18 随机初始化 & 398 & 82 & 27 & 82.9\% & 93.6\% \\
+ViT 随机初始化 & 421 & 59 & 56 & 87.7\% & 88.3\% \\
+变分自编码器（VAE） & 429 & 51 & 23 & \textbf{89.4\%} & \textbf{94.9\%} \\
+JEPA 自监督 & 423 & 57 & 61 & 88.1\% & 87.4\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+这张表与表 \ref{tab:backbone} 的排序几乎完全反了。$\delta_1$ 最高的 ResNet18 识别率最低，$\delta_1$ 只有 0.467 的 VAE 识别率最高，两项误差也都最小。原因在偏差的方向：VAE 的 latent 粗，读数整体偏近，宁可多报；ResNet 的特征细，读数更准但也更容易把近处读远，于是在临界带上放行。
+
+所以单一阈值上的识别率不能用来排序模型，$\delta_1$ 也不能。两个指标指向相反的失效模式，选哪个取决于任务更怕漏判还是更怕误刹。避障场景下，漏判意味着撞上，误刹意味着停机检查，前者不可逆，因此这里偏向召回。表 \ref{tab:task} 以 ResNet18 为参照，列出五个阈值下的判定结果。
+
+\begin{table}[H]
+\centering
+\caption{不同碰撞阈值下的决策结果（ResNet18 随机初始化，留出集 3326 帧）}
 \label{tab:task}
 \begin{tabular}{lccccc}
 \toprule
 阈值 & 该触发且触发 & 漏判 & 误触发 & 识别率 & 精确率 \\
 \midrule
-6 米 & 150 & 87 & 11 & 63.3\% & 93.2\% \\
-\textbf{9 米（设计判据）} & 347 & \textbf{133} & 10 & \textbf{72.3\%} & 97.2\% \\
-12 米 & 1392 & 75 & 5 & 94.9\% & 99.6\% \\
-15 米 & 1544 & 19 & 6 & 98.8\% & 99.6\% \\
-20 米 & 1770 & 77 & 20 & 95.8\% & 98.9\% \\
+6 米 & 289 & 94 & 7 & 60.3\% & 97.6\% \\
+\textbf{9 米（设计判据）} & 398 & \textbf{82} & 27 & \textbf{82.9\%} & 93.6\% \\
+12 米 & 1381 & 57 & 17 & 96.1\% & 98.8\% \\
+15 米 & 1543 & 5 & 24 & 99.7\% & 98.5\% \\
+20 米 & 1786 & 84 & 58 & 95.5\% & 96.9\% \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -420,21 +469,21 @@ R = \frac{N_{\mathrm{TP}}}{N_{\mathrm{TP}} + N_{\mathrm{FN}}}
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=0.72\textwidth]{figs/plot/confusion.png}
-\caption{9 米判据下的两类错误。漏判 133 帧出自 480 帧该触发样本，误触发 10 帧出自 2846 帧不该触发样本。}
+\caption{9 米判据下的两类错误。漏判 82 帧出自 480 帧该触发样本，误触发 27 帧出自 2846 帧不该触发样本。}
 \label{fig:confusion}
 \end{figure}
 
-图 \ref{fig:confusion} 并排给出这两类错误。漏判是误触发的十三倍，方向与第 \ref{sec:errdist} 节的偏差一致：模型在近处习惯性地认为还远，于是不动作。
+图 \ref{fig:confusion} 并排给出这两类错误。漏判是误触发的三倍，方向与第 \ref{sec:errdist} 节的偏差一致：模型在近处习惯性地认为还远，于是不动作。
 
-133 帧漏判还能再定位一层。把阈值从 9 米移到 12 米，漏判降到 75 帧。减少的 58 帧占原漏判的 44\%，全部是真值小于 9 米、预测落在 9 至 12 米的样本，也就是那批系统性读远的帧。剩下的 75 帧错得更远，读数越过 12 米才被漏掉。多数漏判帧上，模型没有把有障碍判成无障碍，只是把距离读远了 1 至 3 米。失效的性质是延迟，不是失明。
+82 帧漏判还能再定位一层。把阈值从 9 米移到 12 米，漏判降到 57 帧，减少的 25 帧占原漏判的 30\%，是真值小于 9 米、预测落在 9 至 12 米的样本，也就是那批系统性读远的帧。剩下的 57 帧错得更远，读数越过 12 米才被漏掉。多数漏判帧上，模型没有把有障碍判成无障碍，只是把距离读远了 1 至 3 米。失效的性质是延迟，不是失明。
 
 两者后果不同：失明需要换模型，延迟只需要换参数。
 
-换模型能买回多少，用同一套判据可以直接算。把网络换成域内自监督的 MicroJEPA，9 米阈值上的漏判从 133 帧降到 57 帧，识别率从 72.3\% 升到 88.1\%，代价是误触发从 10 帧升到 61 帧。这笔账是划算的：多守住 76 帧危险画面，多付出 51 帧误刹。把判据收到 6 米，这笔账就不划算了：漏判从 87 降到 39，误触发从 11 涨到 73，48 帧换 62 帧。
+换模型能买回多少，用同一套判据可以直接算。把网络换成变分自编码器，9 米阈值上的漏判从 82 帧降到 51 帧，误触发从 27 帧降到 23 帧，两项同时变小。换成 MicroJEPA 则相反：漏判降到 57 帧，误触发涨到 61 帧，25 帧的召回换来 34 帧误刹，这笔账不划算。
 
-原因不在阈值，在近场偏差。ImageNet 在 6 至 9 米读远 1.01 米，这个量级正好把障碍推过 9 米线，召回因此在四组里最低。
+原因不在阈值，在近场偏差。ResNet18 在 6 至 9 米读远 0.60 米，临界带上的样本因此被推过 9 米线；VAE 的 latent 粗，近场读数偏近，反而更容易触发。
 
-结论因此要分成两层。逐像素精度上，ImageNet 最高，$\delta_1$ 领先 JEPA 0.032。决策级上，$\delta_1$ 最高的模型漏判最多，换成一个 $\delta_1$ 低 0.032 的模型，漏判少了 76 帧。指标排序与任务排序在这里再次分叉。
+结论因此要分成两层。逐像素精度上，ResNet18 最高，$\delta_1$ 为 0.875。决策级上，它漏判最多，识别率最低；换成 $\delta_1$ 只有 0.467 的 VAE，漏判少 31 帧，误差也少 4 帧。指标排序与任务排序在这里完全反过来。
 
 \begin{figure}[!ht]
 \centering
@@ -445,7 +494,7 @@ R = \frac{N_{\mathrm{TP}}}{N_{\mathrm{TP}} + N_{\mathrm{FN}}}
 
 图 \ref{fig:threshold} 画出这条权衡。十二米更优的结论不成立：判据越宽越不容易漏，代价是动作越频繁。图中误触发数随阈值上移而减少，原因是负样本集合在收缩，这一口径不反映提前动作的运营代价。当前采用的 9 米落在曲线下沿，是五个取值里最容易漏的一个。
 
-把阈值当成固定常量，是一个没有经过检验的设计决定。按上面的偏差数据，6 至 9 米的中位偏差是 $+1.01$ 米，一个名义 9 米的判据因此只守住约 8.0 米。要让它真的守住 9 米，判据应当取 10 米左右。参数该由偏差的符号和量级反推，不必靠反复试。
+把阈值当成固定常量，是一个没有经过检验的设计决定。按上面的偏差数据，6 至 9 米的中位偏差是 $+0.60$ 米，一个名义 9 米的判据因此只守住约 8.4 米。要让它真的守住 9 米，判据应当取 9.6 米，工程上取 10 米。参数该由偏差的符号和量级反推，不必靠反复试。
 
 \section{设计学视角的分析}
 
@@ -470,14 +519,14 @@ R = \frac{N_{\mathrm{TP}}}{N_{\mathrm{TP}} + N_{\mathrm{FN}}}
 
 表 \ref{tab:distance} 就构成一条界面规则：判定的前方距离落在 10 米以内时，该读数标示为低置信；落在 10 米以外时，正常呈现。这条规则不需要模型在推理时额外计算，它由离线统计给出。这是本文认为最容易被忽略的一处设计机会：不确定性的先验往往已经存在于实验报告里，只是没有被转换成界面语言。
 
-还有第二处，位于界面之外。第 \ref{sec:decision} 节显示，把判据从 9 米改到 12 米，识别率从 72.3\% 升到 94.9\%，而这一调整的依据只是一个数：近场中位偏差 $+1.01$ 米。安全裕度因此由界面与参数共同决定。设计学在其中的位置，是把参数从运动学推出的常量，改为误差分布与运营成本之间权衡的结果。前者只需要一次计算，后者需要在两种代价之间作出判断，而判断正是设计的工作。
+还有第二处，位于界面之外。第 \ref{sec:decision} 节显示，把判据从 9 米改到 12 米，识别率从 82.9\% 升到 96.1\%，而这一调整的依据只是一个数：近场中位偏差 $+0.60$ 米。安全裕度因此由界面与参数共同决定。设计学在其中的位置，是把参数从运动学推出的常量，改为误差分布与运营成本之间权衡的结果。前者只需要一次计算，后者需要在两种代价之间作出判断，而判断正是设计的工作。
 
 \subsection{人在回路的学习}
 \label{sec:hitl}
 
 前面讨论的是把系统状态呈现给人，以及在参数上留出裕度。还有一层更长的循环：人的处置行为能否反过来改进系统。
 
-人机交互对这一环有成熟的观察。Parasuraman 与 Riley 把自动化使用中的偏差归为四类，与本场景直接相关的是误用与弃用\cite{parasuraman}：前者是该质疑时没有质疑，后者是可用时不敢用。两者都不是态度问题，而是校准问题，信任与系统的实际能力对不齐。校准需要反馈，人必须能看见这一次判断的对错，才可能把信任调到合适的位置。复核记录的价值正在这里：它把每一次判断与它的后果绑在一起。
+人机交互对这一环有成熟的观察。Parasuraman 与 Riley 把自动化使用中的偏差归为四类，与本场景直接相关的是误用与弃用\cite{parasuraman}：前者是该质疑时没有质疑，后者是可用时不敢用。两者都是校准问题：信任与系统的实际能力对不齐，态度没有错。校准需要反馈，人必须能看见这一次判断的对错，才可能把信任调到合适的位置。复核记录的价值正在这里：它把每一次判断与它的后果绑在一起。
 
 这个循环成立需要三个环节。
 
@@ -512,20 +561,20 @@ R = \frac{N_{\mathrm{TP}}}{N_{\mathrm{TP}} + N_{\mathrm{FN}}}
 
 \subsection{项目亮点}
 
-第一，把世界模型路线放进真实约束下称了一次。结论分成两层：逐像素精度上，域内自监督的 MicroJEPA 测试集 $\delta_1$ 为 0.847，仍低于随机卷积的 0.875；决策级上，它在 9 米判据的识别率是 88.1\%，比 $\delta_1$ 最高的 ImageNet 高出 15.8 个百分点，漏判少 76 帧。
+第一，把世界模型路线放进真实约束下称了一次。结论分成两层：逐像素精度上，域内自监督的 MicroJEPA 测试集 $\delta_1$ 为 0.847，低于随机卷积的 0.875；决策级上，四行的排序几乎完全倒过来，$\delta_1$ 最高的 ResNet18 在 9 米判据上识别率最低（82.9\%），$\delta_1$ 只有 0.467 的变分自编码器最高（89.4\%），漏判少 31 帧。
 
 第二，从算法指标转向交互后果。项目把误差数字追问到交互后果：先换算成避障决策，再换算成设计层面的判断依据。
 
 第三，用分层分析发现反常识现象。总体指标显示模型可用，分层之后才看到误差集中在 10 米以内，而这个区间恰好是避障最要紧的区间。若只看平均值，这个风险会被完全掩盖。
 
-第四，把失效定位到一个可调参数上。近场中位偏差 $+1.01$ 米，使名义 9 米的判据实际只守住 8.0 米；按这一偏差反推，判据应取 10 米左右。若取 12 米，识别率从 72.3\% 升到 94.9\%，但实际守住的距离也超出 2 米，代价是触发频次更高。这是一次设计参数的重估，算法与界面都没有变。
+第四，把失效定位到一个可调参数上。近场中位偏差 $+0.60$ 米，使名义 9 米的判据实际只守住 8.4 米；按这一偏差反推，判据应取 9.6 米，工程上取 10 米。若取 12 米，识别率从 82.9\% 升到 96.1\%，但实际守住的距离也超出 2 米，代价是触发频次更高。这是一次设计参数的重估，算法与界面都没有变。
 
 
 \subsection{项目经验}
 
-第一、评测标准决定结论。$\delta_1$ 把 ViT 随机排在末位，它的 9 米召回却高于 ImageNet。两个指标指向相反的失效模式，用哪个排序会得出相反的答案。
+第一、评测标准决定结论。$\delta_1$ 把变分自编码器排在末位，它的 9 米识别率却是四行最高。两个指标指向相反的失效模式，用哪个排序会得出相反的答案。
 
-第二、语料的分布决定失效落在哪里。全部数据里 25 至 35 米占 69\%，近场只占 6\%，模型把先验放在了更远的一侧。于是 $\delta_1$ 最高的 ImageNet 在 9 米判据上识别率最低。总量与分布不是一回事，指标变好与任务变坏可以同时发生。
+第二、语料的分布决定失效落在哪里。全部数据里 25 至 35 米占 69\%，近场只占 6\%，模型把先验放在了更远的一侧。于是 $\delta_1$ 最高的 ResNet18 在 9 米判据上识别率最低。总量与分布不是一回事，指标变好与任务变坏可以同时发生。
 
 第三、设计问题常常藏在技术指标的背面。如果只看 $\delta_1$ 是 0.879，会认为模型已经可用；把剩下的部分展开，才看到失效集中在什么地方，那才是设计的起点。
 
@@ -614,6 +663,12 @@ R = \frac{N_{\mathrm{TP}}}{N_{\mathrm{TP}} + N_{\mathrm{FN}}}
 \bibitem{mil} Liang Y, Zhang Z, Xian C, He S. Delving Into Multi-Illumination Monocular Depth Estimation: A New Dataset and Method[J]. IEEE Transactions on Multimedia, 2025, 27(1): 1018-1032.
 
 \bibitem{ijepa} Assran M, Duquenne P A, Caron M, et al. Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture[C]. IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2023.
+
+\bibitem{marigold} Ke B, Obukhov A, Huang S, et al. Repurposing Diffusion-Based Image Generators for Monocular Depth Estimation[C]//CVPR. 2024.
+
+\bibitem{wordepth} Mahapatra A, Bhambri S, Kumar A, et al. WorDepth: Variational Language Prior for Monocular Depth Estimation[J]. arXiv:2404.03635, 2024.
+
+\bibitem{jepadepth} JEPADepth: Self-Supervised Monocular Depth Estimation via Joint-Embedding Predictive Architectures[J]. Mathematics, 2026, 14(21): 3846.
 
 \end{thebibliography}
 
