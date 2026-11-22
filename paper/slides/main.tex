@@ -227,12 +227,15 @@ Transformer 原本处理序列，核心是\textbf{自注意力}：每个元素�
 %--------------------------------------------------------------
 \begin{frame}{两条路径的对照}
 
+{\footnotesize \textbf{四个模型用同一批数据训练。}同样的 375 个训练航段、43,271 帧，同一验证集与测试集；编码器全部固定，只训练同一个 0.81 M 的解码头（M 指百万参数），同样 15 轮、同一优化器。唯一变化的量是编码器的来源。}
+
+\vspace{0.15cm}
 \begin{table}[]
 \centering
 \footnotesize
 \begin{tabular}{@{}llccc@{}}
 \toprule
-特征提取网络 & 表征来源 & 验证集 $\delta_1$ & 测试集 $\delta_1$ & 测试集 AbsRel \\
+特征提取网络 & 编码器来源 & 验证集 $\delta_1$ & 测试集 $\delta_1$ & 测试集 AbsRel \\
 \midrule
 ResNet18 随机初始化 & 随机权重，未训练 & 0.855 & \textbf{0.875} & \textbf{0.135} \\
 ViT 随机初始化 & 随机权重，未训练 & 0.786 & 0.772 & 0.230 \\
@@ -242,19 +245,8 @@ JEPA 自监督 & 本数据预测 & \textbf{0.872} & 0.847 & 0.161 \\
 \end{tabular}
 \end{table}
 
-\vspace{0.15cm}
-{\footnotesize \textbf{$\delta_1$} 是像素级命中率：预测与真实的比值落在 0.8 至 1.25 之间的像素占比，越高越好。\textbf{AbsRel} 是平均相对误差，越低越好。}
-
-\vspace{0.15cm}
-{\footnotesize 编码器全部固定，只训练同一个 0.81 M 的解码头（M 指百万参数），因此差别只来自表征。三处原因：}
-
 \vspace{0.1cm}
-{\small
-\begin{itemize}
-    \item 架构：卷积的局部连接比全局注意力更贴合逐像素回归
-    \item 信息组织：重建把画面压成 36 个格，预测保留 576 个 token
-    \item 容量：ResNet18 有 11.2 M 参数，JEPA 编码器只有 0.29 M
-\end{itemize}}
+{\footnotesize \textbf{$\delta_1$} 是像素级命中率：预测与真实的比值落在 0.8 至 1.25 的像素占比。\textbf{AbsRel} 是平均相对误差。三处原因：架构、信息组织方式、容量。}
 
 \src{Dosovitskiy A, Beyer L, Kolesnikov A, et al. An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale. ICLR, 2021.}
 \end{frame}
