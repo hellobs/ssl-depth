@@ -57,13 +57,13 @@
 \begin{columns}[T]
 \column{0.55\textwidth}
 \begin{itemize}
-    \item 配送机巡航约 \hl{8 米每秒}
-    \item 从发现障碍到完成制动约 \hl{1 秒}
-    \item 这段反应时间对应 \hl{8 米}位移
+    \item 制动距离由两段组成：响应时间内继续前飞的位移，加上制动本身的位移
+    \item 巡航 \hl{8 m/s}，总响应约 \hl{1 s}，对应 \hl{8 m}
+    \item 加 1 米余量，取 \hl{9 m} 作为紧急制动线
 \end{itemize}
 
-\vspace{0.3cm}
-前视感知因此必须在 9 米以外给出可信读数，否则即使判断正确也来不及制动。
+\vspace{0.25cm}
+这条线是最后一刻必须已经决定制动的距离，不是避障的启动距离。
 
 \column{0.42\textwidth}
 \centering
@@ -72,15 +72,15 @@
 量 & 数值 \\
 \midrule
 巡航速度 & 8 m/s \\
-制动时间 & 约 1 s \\
-位移 & 8 m \\
-判据 & \textbf{9 m} \\
+总响应时间 & 约 1 s \\
+响应内位移 & 8 m \\
+紧急制动线 & \textbf{9 m} \\
 \bottomrule
 \end{tabular}
 \end{columns}
 
-\vspace{0.4cm}
-模型只做一件事：判断前方最近障碍有没有进入 9 米。进入之后绕行、减速还是返航，由规划层决定。
+\vspace{0.15cm}
+{\small 正常绕行应在二十米以外开始，由规划层负责，本文不测那一段。判据随速度变化，速度减半则这条线相应缩短，不是固定常数。}
 
 \end{frame}
 
