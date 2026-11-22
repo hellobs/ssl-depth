@@ -157,46 +157,28 @@
 
 {\footnotesize
 \begin{itemize}\setlength{\itemsep}{0.5pt}
-    \item ResNet18 是卷积网络的一种固定结构：18 个带权重的层，四个阶段，每阶段两个残差块
-    \item 每过一阶段分辨率减半、通道加倍；去掉分类头，取 512 通道、4$\times$6 的特征图当表征
-    \item 加深不必然更好：二十层之后训练误差反而上升，原因是梯度逐层相乘越传越小，不是过拟合
-    \item 残差块把输入直接加到输出上，反向传播有一条不经过卷积的短路，网络只需学差值
+    \item 层数增加并不必然更好：二十层之后继续加深，训练误差反而上升
+    \item 原因不是过拟合：梯度逐层回传时被反复相乘，越传越小，前面的层收不到更新
+    \item 解法是加一条直连通道，把块的输入直接加到输出上，反向传播有一条不经过卷积的短路
+    \item 网络要学的从完整映射变成差值，输出为 $y = F(x) + x$
 \end{itemize}}
 
-\vspace{0.1cm}
+\vspace{0.4cm}
 \begin{center}
-\begin{tikzpicture}[font=\scriptsize, node distance=3mm,
+\begin{tikzpicture}[font=\small, node distance=4mm,
   blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
-              inner sep=2pt, minimum height=6.4mm},
-  acc/.style={draw=scutgold!85, fill=scutgold!12, rounded corners=2pt, align=center,
-              inner sep=2pt, minimum height=6.4mm},
-  dot/.style={circle, draw=scutblue!60, fill=white, inner sep=0.8pt, font=\scriptsize},
-  ar/.style={-{Latex[length=1.1mm]}, draw=scutblue!55, semithick}]
+              inner sep=2.4pt, minimum height=8mm},
+  dot/.style={circle, draw=scutblue!60, fill=white, inner sep=1pt, font=\small},
+  ar/.style={-{Latex[length=1.2mm]}, draw=scutblue!55, semithick}]
 
-\node[blk] (in) {输入 192$\times$108};
-\node[blk, right=of in] (stem) {卷积 + 池化};
-\node[blk, right=of stem] (s1) {阶段一 64};
-\node[blk, right=of s1] (s2) {阶段二 128};
-\node[blk, right=of s2] (s3) {阶段三 256};
-\node[blk, right=of s3] (s4) {阶段四 512};
-\node[acc, right=of s4] (ft) {4$\times$6$\times$512};
-
-\draw[ar] (in) -- (stem);
-\draw[ar] (stem) -- (s1);
-\draw[ar] (s1) -- (s2);
-\draw[ar] (s2) -- (s3);
-\draw[ar] (s3) -- (s4);
-\draw[ar] (s4) -- (ft);
-
-\coordinate (r2) at ([yshift=-11mm]in.south);
-\node[dot] (x) at (r2) {$x$};
-\node[blk, right=5mm of x] (c1) {3$\times$3 卷积};
+\node[dot] (x) {$x$};
+\node[blk, right=6mm of x] (c1) {3$\times$3 卷积};
 \node[blk, right=of c1] (b1) {批归一化 + ReLU};
 \node[blk, right=of b1] (c2) {3$\times$3 卷积};
 \node[blk, right=of c2] (b2) {批归一化};
-\node[dot, draw=scutgold, fill=scutgold!15, right=5mm of b2] (add) {$+$};
+\node[dot, draw=scutgold, fill=scutgold!15, right=6mm of b2] (add) {$+$};
 \node[blk, right=of add] (relu) {ReLU};
-\node[dot, right=4mm of relu] (out) {};
+\node[dot, right=5mm of relu] (out) {};
 
 \draw[ar] (x) -- (c1);
 \draw[ar] (c1) -- (b1);
@@ -206,13 +188,61 @@
 \draw[ar] (add) -- (relu);
 \draw[ar] (relu) -- (out);
 
-\coordinate (s) at ([yshift=-3.4mm]x.south);
+\coordinate (s) at ([yshift=-5mm]x.south);
 \draw[ar, draw=scutgold] (x.south) -- (s) -- (s -| add.south) -- (add.south);
-\node[below=0.5mm, font=\scriptsize, text=scutgold] at ($(s)!0.5!(s -| add.south)$) {直连，不改动};
+\node[below=0.8mm, font=\small, text=scutgold] at ($(s)!0.5!(s -| add.south)$) {直连，不改动};
 
 \end{tikzpicture}
 
-{\scriptsize 上：四个阶段，跨阶段减半，末层输出 4$\times$6$\times$512。下：一个残差块，直连通道把输入加到第二个卷积的输出上。}
+{\scriptsize 一个残差块。直连通道把输入原样送到相加处，卷积那一路只需学它与输入的差值。}
+\end{center}
+
+\src{He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.}
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{ResNet18}
+
+{\footnotesize
+\begin{itemize}\setlength{\itemsep}{0.5pt}
+    \item 18 个带权重的层：1 个 7$\times$7 卷积，16 个 3$\times$3 卷积（8 个残差块），1 个全连接分类头
+    \item 四个阶段，每阶段两块，通道依次为 64、128、256、512，跨阶段分辨率减半
+    \item 本文去掉分类头，取最后一张 4$\times$6$\times$512 的特征图当表征，接同一个 0.81 M 深度头
+    \item 权重随机初始化，不加载预训练
+\end{itemize}}
+
+\vspace{0.4cm}
+\begin{center}
+\begin{tikzpicture}[font=\footnotesize, node distance=4mm,
+  blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
+              inner sep=2.4pt, minimum height=8mm},
+  acc/.style={draw=scutgold!85, fill=scutgold!12, rounded corners=2pt, align=center,
+              inner sep=2.4pt, minimum height=8mm},
+  ar/.style={-{Latex[length=1.2mm]}, draw=scutblue!55, semithick}]
+
+\node[blk] (in) {输入\\192$\times$108};
+\node[blk, right=of in] (stem) {卷积 + 池化\\64};
+\node[blk, right=of stem] (s1) {阶段一\\2 块，64};
+\node[blk, right=of s1] (s2) {阶段二\\2 块，128};
+\node[blk, right=of s2] (s3) {阶段三\\2 块，256};
+\node[blk, right=of s3] (s4) {阶段四\\2 块，512};
+\node[acc, right=of s4] (ft) {特征图\\4$\times$6$\times$512};
+
+\draw[ar] (in) -- (stem);
+\draw[ar] (stem) -- (s1);
+\draw[ar] (s1) -- (s2);
+\draw[ar] (s2) -- (s3);
+\draw[ar] (s3) -- (s4);
+\draw[ar] (s4) -- (ft);
+
+\node[below=3mm of s1, font=\scriptsize, text=scutgold] {尺寸不变};
+\node[below=3mm of s2, font=\scriptsize, text=scutgold] {减半};
+\node[below=3mm of s3, font=\scriptsize, text=scutgold] {减半};
+\node[below=3mm of s4, font=\scriptsize, text=scutgold] {减半};
+
+\end{tikzpicture}
+
+{\scriptsize 本文的 ResNet18 主干。跨阶段减半，通道加倍，末层输出 4$\times$6$\times$512，接深度头。}
 \end{center}
 
 \src{He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.}
@@ -290,17 +320,62 @@
 %--------------------------------------------------------------
 \begin{frame}{世界模型与联合嵌入预测}
 
-\begin{itemize}
+{\footnotesize
+\begin{itemize}\setlength{\itemsep}{0.5pt}
     \item LeCun 的主张：不在像素层面预测未来，而在表征空间预测世界的下一步
-    \item JEPA 只用相邻帧，预测下一帧的表征，不还原像素；目标由教师编码器给出，教师只做指数滑动平均，避免表征塌成常数
-    \item 编码器是视觉 Transformer：图切成 6$\times$6 的小块，每块变成一个向量（token），共 576 个；自注意力让每个 token 与全部 token 计算相关性，一次看到全图
-\end{itemize}
+    \item JEPA 只用相邻帧，预测下一帧的表征，不还原像素；目标由教师编码器给出，教师只做滑动平均
+    \item 编码器是视觉 Transformer，图切成 576 个块，块之间用自注意力互相读，一次看到全图
+\end{itemize}}
 
-\vspace{0.15cm}
+\vspace{0.1cm}
 \begin{center}
-\includegraphics[width=0.76\textwidth]{pic/jepa.png}
+\begin{tikzpicture}[font=\small, node distance=6mm,
+  blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
+              inner sep=2.4pt, minimum height=8mm},
+  enc/.style={draw=scutblue!75, fill=scutblue!14, rounded corners=2pt, align=center,
+              inner sep=2.4pt, minimum height=9mm},
+  vec/.style={draw=scutsky!80, fill=scutsky!10, rounded corners=2pt, align=center,
+              inner sep=2.4pt, minimum height=8mm},
+  prd/.style={draw=scutgold!85, fill=scutgold!12, rounded corners=2pt, align=center,
+              inner sep=2.4pt, minimum height=9mm},
+  froz/.style={draw=black!35, fill=black!5, rounded corners=2pt, align=center,
+               inner sep=2.4pt, minimum height=9mm, text=black!65},
+  loss/.style={draw=scutgold!90, fill=scutgold!20, rounded corners=2pt, align=center,
+               inner sep=2.4pt, minimum height=10mm},
+  ar/.style={-{Latex[length=1.2mm]}, draw=scutblue!55, semithick},
+  dar/.style={-{Latex[length=1.2mm]}, draw=black!45, semithick, dashed}]
 
-{\scriptsize 上下文编码器、预测器与目标编码器。本文只取其中的编码器，6 层、192 维、0.29 M 参数。}
+\node[blk] (in1) {图像 $t$};
+\node[enc, right=of in1] (ctx) {上下文编码器\\更新};
+\node[vec, right=of ctx] (z1) {$z_t$};
+\node[prd, right=of z1] (pd) {预测器\\更新};
+\node[vec, right=of pd] (zp) {$\hat z_{t+1}$};
+
+\node[blk, below=2.05cm of in1] (in2) {图像 $t+1$};
+\node[froz, right=of in2] (tenc) {目标编码器\\EMA，冻结};
+\node[vec, right=of tenc] (z2) {$z_{t+1}$};
+
+\node[loss] (loss) at ([xshift=2.4cm, yshift=-1.02cm]zp.east) {L1 损失\\只在表征上};
+
+\draw[ar] (in1) -- (ctx);
+\draw[ar] (ctx) -- (z1);
+\draw[ar] (z1) -- (pd);
+\draw[ar] (pd) -- (zp);
+
+\draw[ar] (in2) -- (tenc);
+\draw[ar] (tenc) -- (z2);
+
+\coordinate (jx) at ([xshift=7mm]zp.east);
+\draw[ar] (zp.east) -- (jx) -- (jx |- loss.west);
+\draw[dar] (z2.east) -- (jx |- z2.east) -- (jx |- loss.west);
+\draw[ar] (jx |- loss.west) -- (loss.west);
+
+\node[below=0.4mm, font=\scriptsize, text=black!55]
+  at ($(z2.east)!0.5!(jx |- z2.east)$) {不回传梯度};
+
+\end{tikzpicture}
+
+{\scriptsize 上行更新，下行冻结。目标编码器只做指数滑动平均，不接收梯度。本文只取上下文编码器那一支，6 层、192 维。}
 \end{center}
 
 \src{LeCun Y. A Path Towards Autonomous Machine Intelligence. OpenReview, 2022.}
