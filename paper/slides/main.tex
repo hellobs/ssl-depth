@@ -8,6 +8,8 @@
 \usepackage[fontset=windows]{ctex}
 \usepackage{latexsym,amsmath,xcolor,multicol,booktabs}
 \usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,fit}
 \usepackage{fourier}
 \usepackage{hyperref}
 
@@ -61,7 +63,7 @@
 %--------------------------------------------------------------
 \begin{frame}{单目深度估计}
 
-\textbf{单目}指只用一只相机。\textbf{深度估计}给每个像素估一个沿光轴的距离，即相机坐标系下的 $Z$ 值。它不是到相机中心的直线距离，视场边缘的读数比直线距离短。
+\textbf{单目}指只用一只相机。\textbf{深度}是场景点沿光轴到相机平面的距离，即相机坐标系下的 $Z$ 分量。\textbf{深度估计}就是从一张图把每个像素对应的这个量恢复出来。
 
 \vspace{0.2cm}
 \begin{itemize}
@@ -71,10 +73,10 @@
 \end{itemize}
 
 \vspace{0.2cm}
-\textbf{相对深度}只要求大小顺序，允许整体缩放。\textbf{米制深度}直接给米数。无人机要判断九米以内有没有障碍，只能要后者。
+\textbf{相对深度}只要求顺序，允许整体缩放。\textbf{米制深度}直接给米数。无人机要判断九米以内有没有障碍，只能要后者。
 
 \vspace{0.1cm}
-{\small 本文训练的标签是\textbf{视差}，即距离的倒数 $1/d$。取倒数后，近处的差异被放大，模型更容易学准近处，而近处正是避障关心的区间。}
+{\small 标签取\textbf{视差} $1/d$，即深度的倒数。倒过来之后近处差异被放大，而近处正是避障关心的区间。}
 
 \src{Ranftl R, Bochkovskiy A, Koltun V. Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer. TPAMI, 2020.}
 \end{frame}
@@ -153,18 +155,64 @@
 %--------------------------------------------------------------
 \begin{frame}{残差网络}
 
-\begin{itemize}
-    \item ResNet18 是卷积网络的一种固定结构：18 个带权重的层，四个阶段，每阶段两个残差块，每过一阶段分辨率减半、通道加倍
-    \item 本文去掉末尾的分类头，取最后的特征图当表征：512 个通道、4$\times$6 格，接同一个深度头
-    \item 加深并不必然更好：二十层之后训练误差反而上升，原因是梯度逐层相乘越传越小，前面几层收不到更新，不是过拟合
-    \item 残差块把输入直接加到输出上，反向传播有一条不经过卷积的短路，每层只需学输入与输出的差值
-\end{itemize}
+{\footnotesize
+\begin{itemize}\setlength{\itemsep}{0.5pt}
+    \item ResNet18 是卷积网络的一种固定结构：18 个带权重的层，四个阶段，每阶段两个残差块
+    \item 每过一阶段分辨率减半、通道加倍；去掉分类头，取 512 通道、4$\times$6 的特征图当表征
+    \item 加深不必然更好：二十层之后训练误差反而上升，原因是梯度逐层相乘越传越小，不是过拟合
+    \item 残差块把输入直接加到输出上，反向传播有一条不经过卷积的短路，网络只需学差值
+\end{itemize}}
 
 \vspace{0.1cm}
 \begin{center}
-\includegraphics[width=0.9\textwidth]{pic/resblock.png}
+\begin{tikzpicture}[font=\scriptsize, node distance=3mm,
+  blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
+              inner sep=2pt, minimum height=6.4mm},
+  acc/.style={draw=scutgold!85, fill=scutgold!12, rounded corners=2pt, align=center,
+              inner sep=2pt, minimum height=6.4mm},
+  dot/.style={circle, draw=scutblue!60, fill=white, inner sep=0.8pt, font=\scriptsize},
+  ar/.style={-{Latex[length=1.1mm]}, draw=scutblue!55, semithick}]
 
-{\scriptsize 残差块结构。本文的 ResNet18 权重随机初始化，不加载预训练。}
+\node[blk] (in) {输入 192$\times$108};
+\node[blk, right=of in] (stem) {卷积 + 池化};
+\node[blk, right=of stem] (s1) {阶段一 64};
+\node[blk, right=of s1] (s2) {阶段二 128};
+\node[blk, right=of s2] (s3) {阶段三 256};
+\node[blk, right=of s3] (s4) {阶段四 512};
+\node[acc, right=of s4] (ft) {4$\times$6$\times$512};
+
+\draw[ar] (in) -- (stem);
+\draw[ar] (stem) -- (s1);
+\draw[ar] (s1) -- (s2);
+\draw[ar] (s2) -- (s3);
+\draw[ar] (s3) -- (s4);
+\draw[ar] (s4) -- (ft);
+
+\coordinate (r2) at ([yshift=-11mm]in.south);
+\node[dot] (x) at (r2) {$x$};
+\node[blk, right=5mm of x] (c1) {3$\times$3 卷积};
+\node[blk, right=of c1] (b1) {批归一化 + ReLU};
+\node[blk, right=of b1] (c2) {3$\times$3 卷积};
+\node[blk, right=of c2] (b2) {批归一化};
+\node[dot, draw=scutgold, fill=scutgold!15, right=5mm of b2] (add) {$+$};
+\node[blk, right=of add] (relu) {ReLU};
+\node[dot, right=4mm of relu] (out) {};
+
+\draw[ar] (x) -- (c1);
+\draw[ar] (c1) -- (b1);
+\draw[ar] (b1) -- (c2);
+\draw[ar] (c2) -- (b2);
+\draw[ar] (b2) -- (add);
+\draw[ar] (add) -- (relu);
+\draw[ar] (relu) -- (out);
+
+\coordinate (s) at ([yshift=-3.4mm]x.south);
+\draw[ar, draw=scutgold] (x.south) -- (s) -- (s -| add.south) -- (add.south);
+\node[below=0.5mm, font=\scriptsize, text=scutgold] at ($(s)!0.5!(s -| add.south)$) {直连，不改动};
+
+\end{tikzpicture}
+
+{\scriptsize 上：四个阶段，跨阶段减半，末层输出 4$\times$6$\times$512。下：一个残差块，直连通道把输入加到第二个卷积的输出上。}
 \end{center}
 
 \src{He K, Zhang X, Ren S, Sun J. Deep Residual Learning for Image Recognition. CVPR, 2016.}
@@ -173,16 +221,48 @@
 %--------------------------------------------------------------
 \begin{frame}{视觉 Transformer}
 
-Transformer 原本处理序列，核心是\textbf{自注意力}：每个元素与所有元素计算相关性，再按相关性加权求和，得到新的表示。多个注意力头并行，各自捕捉不同的关系。它没有卷积的局部窗口假设，因此要靠位置编码告诉模型先后顺序。
-
-\vspace{0.15cm}
-\textbf{视觉 Transformer} 把这套机制搬到图像上：把图切成小块，每块拉直成一个向量，加上位置编码，整体送进 Transformer。
+{\footnotesize
+\begin{itemize}\setlength{\itemsep}{0.5pt}
+    \item Transformer 原本处理序列，核心是\textbf{自注意力}：每个位置与所有位置算相关性，再加权求和
+    \item 图像没有天然的先后。ViT 把图切成小块，每块拉直成向量，加上位置编码，块与块之间才有区分
+    \item 本文的 ViT：576 个块（每块 6$\times$6 像素）、6 层、192 维、3 个头，权重随机初始化
+\end{itemize}}
 
 \vspace{0.1cm}
 \begin{center}
-\includegraphics[width=0.92\textwidth]{pic/transformer.png}
+\begin{tikzpicture}[font=\small, node distance=3.5mm,
+  blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
+              inner sep=2.2pt, minimum height=7mm},
+  acc/.style={draw=scutgold!85, fill=scutgold!12, rounded corners=2pt, align=center,
+              inner sep=2.2pt, minimum height=7mm},
+  qk/.style={draw=scutsky!75, fill=scutsky!8, rounded corners=2pt, align=center,
+             inner sep=2pt, minimum height=6.4mm},
+  ar/.style={-{Latex[length=1.1mm]}, draw=scutblue!55, semithick}]
 
-{\scriptsize 本文的 ViT：6 层编码器，192 维，3 个头，576 个 token，权重随机初始化。}
+\node[blk] (img) {图像 192$\times$108};
+\node[blk, right=of img] (pat) {切成 576 块};
+\node[blk, right=of pat] (emb) {线性投影 + 位置编码};
+\node[blk, right=of emb] (enc) {编码器 $\times$6};
+\node[acc, right=of enc] (out) {576$\times$192};
+
+\draw[ar] (img) -- (pat);
+\draw[ar] (pat) -- (emb);
+\draw[ar] (emb) -- (enc);
+\draw[ar] (enc) -- (out);
+
+\node[blk, anchor=west] (q) at ([yshift=-11mm]img.south west) {查询 $q$};
+\node[qk, right=6mm of q] (k) {与 576 个键点积};
+\node[qk, right=of k] (sm) {softmax 归一化};
+\node[blk, right=of sm] (v) {对 576 个值加权求和};
+
+\draw[ar] (q) -- (k);
+\draw[ar] (k) -- (sm);
+\draw[ar] (sm) -- (v);
+
+\end{tikzpicture}
+
+\vspace{0.12cm}
+{\scriptsize 上：ViT 的数据流，一张图变成 576 个向量。下：自注意力的四步，每个块与其余 575 个块各算一次相关性。}
 \end{center}
 
 \src{Vaswani A, et al. Attention Is All You Need. NIPS, 2017.}
