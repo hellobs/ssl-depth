@@ -19,7 +19,8 @@
 \title[基于人工智能的无人机单目深度测距]{基于人工智能的无人机单目深度测距：\\ 误差研究与设计学分析}
 \institute{
     华南理工大学 \\
-    \small 指导教师：李粤 \quad 课程：小白学人工智能
+    \quad 指导教师：李粤  \\
+	\small 课程：小白学人工智能
 }
 \date{\small \today}
 \usepackage{SCUTstyle}
@@ -67,14 +68,13 @@
 
 \vspace{0.2cm}
 \begin{itemize}
-    \item 单张图在几何上没有唯一解：一个像素只确定一条射线，深度不定；一块画面的大小只由真实大小与距离的比值决定，两者分不开
-    \item 人靠线索判断：近处纹理粗、远处细；被遮挡的物体在后；车道线宽度这类已知尺寸可以反推；平行线汇聚到消失点
-    \item 这些线索都不精确，单目测距天生带误差，而且误差往往有方向
+    \item 单张图在几何上没有唯一解：一个像素只确定一条射线，深度不定；一块画面的大小只由真实大小与距离的比值决定，两者分不开；把楼房、车、地面连同间距以光心等比放大，成像完全不变。
+    \item 人靠线索判断：近处纹理粗、远处细；被遮挡的物体在后；车道线宽度这类已知尺寸可以大致反推；
+    \item 这些线索都不精确，单目测距天生带误差。
 \end{itemize}
 
 \vspace{0.2cm}
-\textbf{相对深度}只要求顺序，允许整体缩放。\textbf{米制深度}要给米数，可照片里没有米：把楼房、车、地面连同间距以光心等比放大，成像完全不变。尺度只能从外部来，本文用渲染引擎输出的深度真值。无人机判断九米以内有没有障碍，只能要米制。
-
+\textbf{相对深度}允许整体缩放。但实际中使用的\textbf{米制深度}要给米数，可照片里没有米尺度只能从外部来，本文用Unreal Engine引擎输出的深度真值。无人机判断九米以内有没有障碍，只能要米制。
 
 \src{Ranftl R, Bochkovskiy A, Koltun V. Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer. TPAMI, 2020.}
 \end{frame}
@@ -112,6 +112,23 @@
 {\small 这条线是最后一刻必须已经作出决定的距离，不是避障启动距离。正常绕行在二十米以外开始，由规划层负责。}
 
 \src{ISO 15964:2025. Detection and avoidance systems for uncrewed aircraft systems. ISO, 2025.}
+\end{frame}
+
+%--------------------------------------------------------------
+\begin{frame}{为什么不用激光雷达}
+
+{\footnotesize
+\begin{itemize}\setlength{\itemsep}{1pt}
+    \item 行业不是二选一：美团第四代集成 14 个感知单元，双目相机、4D 毫米波雷达与前向激光雷达并用，感知 0.7 至 40 米
+    \item 激光雷达长在测距：主动发射激光测回波，不依赖环境纹理，也不受光照限制
+    \item 短在分类与玻璃：三十米外的点云只给出轮廓，电线、飞鸟、外挂广告牌分不开，三者的避让策略不同；幕墙镜面反射，回波不返回
+    \item 还有成本与载荷：机械式曾单价数万美元，载荷每增一克都折损续航，感知成本要乘机队规模
+\end{itemize}}
+
+\vspace{0.3cm}
+{\small 本文的对象是成本敏感航线上只配一台前视相机的机型，它同时也是高端机型在激光雷达故障或雨雾衰减后的降级形态。\textbf{要回答的是：退到单目，九米判据还能不能撑住。}}
+
+\src{Liang Y, Deng B, Liu W, Qin J, He S. Monocular Depth Estimation for Glass Walls With Context. IEEE TPAMI, 2023.}
 \end{frame}
 
 %--------------------------------------------------------------
