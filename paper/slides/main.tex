@@ -268,78 +268,7 @@
 \begin{frame}{Transformer}
 
 \centering
-\begin{tikzpicture}[x=1cm, y=1cm, >=Latex, font=\fontsize{5.2}{5.8}\selectfont,
-  box/.style={draw=scutblue!70, fill=scutblue!6, rounded corners=1.2pt, align=center,
-              inner sep=0.7pt, minimum width=2.0cm, minimum height=0.38cm},
-  box2/.style={box, minimum height=0.52cm},
-  op/.style={circle, draw=scutgold!90, fill=scutgold!25, inner sep=0.12pt},
-  ar/.style={->, draw=scutblue!70, semithick},
-  res/.style={->, draw=scutblue!45, thin},
-  lab/.style={font=\fontsize{4.6}{5.4}\selectfont}]
-
-% ================= 编码器 =================
-\node[lab] (ein) at (0,0) {Inputs};
-\node[box] (emb1) at (0,0.50) {Input Embedding};
-\node[op]  (p1)   at (0,1.00) {};
-\node[box] (mha1) at (0,1.50) {Multi-Head Attention};
-\node[box] (an1)  at (0,2.00) {Add \& Norm};
-\node[box] (ff1)  at (0,2.50) {Feed Forward};
-\node[box] (an2)  at (0,3.00) {Add \& Norm};
-
-\draw[ar] (ein) -- (emb1);
-\draw[ar] (emb1) -- (p1);
-\draw[ar] (p1) -- (mha1);
-\draw[ar] (mha1) -- (an1);
-\draw[ar] (an1) -- (ff1);
-\draw[ar] (ff1) -- (an2);
-
-\node[lab, anchor=east, align=center] at (-1.78,0.98) {Positional\\Encoding};
-\draw[ar] (-1.78,0.82) -- (-1.78,0.68) -| (p1.west);
-
-\draw[res] (-1.14,1.25) -- (-1.14,2.00) -- (an1.west);
-\draw[res] (-1.14,2.25) -- (-1.14,3.00) -- (an2.west);
-\draw[draw=scutblue!45, rounded corners=3pt] (-1.33,1.31) rectangle (-1.25,3.19);
-\node[font=\fontsize{5.2}{6}\selectfont, text=scutblue!70] at (-1.55,2.25) {$N\times$};
-
-% ================= 解码器 =================
-\node[lab, align=center] (din) at (4.4,-0.05) {Outputs\\(shifted right)};
-\node[box] (emb2) at (4.4,0.52) {Output Embedding};
-\node[op]  (p2)   at (4.4,1.02) {};
-\node[box2] (mha2) at (4.4,1.60) {Masked Multi-Head\\Attention};
-\node[box] (an3)  at (4.4,2.16) {Add \& Norm};
-\node[box] (mha3) at (4.4,2.66) {Multi-Head Attention};
-\node[box] (an4)  at (4.4,3.16) {Add \& Norm};
-\node[box] (ff2)  at (4.4,3.66) {Feed Forward};
-\node[box] (an5)  at (4.4,4.16) {Add \& Norm};
-\node[box] (lin)  at (4.4,4.66) {Linear};
-\node[box] (smax) at (4.4,5.16) {Softmax};
-\node[lab, align=center] (dout) at (4.4,5.72) {Output\\Probabilities};
-
-\draw[ar] (din) -- (emb2);
-\draw[ar] (emb2) -- (p2);
-\draw[ar] (p2) -- (mha2);
-\draw[ar] (mha2) -- (an3);
-\draw[ar] (an3) -- (mha3);
-\draw[ar] (mha3) -- (an4);
-\draw[ar] (an4) -- (ff2);
-\draw[ar] (ff2) -- (an5);
-\draw[ar] (an5) -- (lin);
-\draw[ar] (lin) -- (smax);
-\draw[ar] (smax) -- (dout);
-
-\node[lab, anchor=west, align=center] at (6.12,0.98) {Positional\\Encoding};
-\draw[ar] (6.12,0.82) -- (6.12,0.68) -| (p2.east);
-
-\draw[res] (5.54,1.28) -- (5.54,2.16) -- (an3.east);
-\draw[res] (5.54,2.41) -- (5.54,3.16) -- (an4.east);
-\draw[res] (5.54,3.41) -- (5.54,4.16) -- (an5.east);
-\draw[draw=scutblue!45, rounded corners=3pt] (5.73,1.34) rectangle (5.81,4.35);
-\node[font=\fontsize{5.2}{6}\selectfont, text=scutblue!70] at (6.03,2.85) {$N\times$};
-
-% 编码器 -> 解码器
-\draw[ar, draw=scutgold!90] (an2.east) -- (2.60,3.00) -- (2.60,2.66) -- (mha3.west);
-
-\end{tikzpicture}
+\includegraphics[height=6.05cm]{pic/transformer_fig.png}
 
 {\scriptsize 图源：Vaswani 等，2017，Figure 1。编码器读整句，解码器逐词生成。}
 \end{frame}
