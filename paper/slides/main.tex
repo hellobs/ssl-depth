@@ -268,21 +268,23 @@
 \begin{frame}{Transformer}
 
 \centering
-\begin{tikzpicture}[x=1cm, y=1cm, >=Latex, font=\fontsize{5.2}{6.0}\selectfont,
+\begin{tikzpicture}[x=1cm, y=1cm, >=Latex, font=\fontsize{5.2}{5.8}\selectfont,
   box/.style={draw=scutblue!70, fill=scutblue!6, rounded corners=1.2pt, align=center,
-              inner sep=0.8pt, minimum width=2.2cm, minimum height=0.40cm},
-  op/.style={circle, draw=scutgold!90, fill=scutgold!25, inner sep=0.15pt},
+              inner sep=0.7pt, minimum width=2.0cm, minimum height=0.38cm},
+  box2/.style={box, minimum height=0.52cm},
+  op/.style={circle, draw=scutgold!90, fill=scutgold!25, inner sep=0.12pt},
   ar/.style={->, draw=scutblue!70, semithick},
-  res/.style={->, draw=scutblue!45, thin}]
+  res/.style={->, draw=scutblue!45, thin},
+  lab/.style={font=\fontsize{4.6}{5.4}\selectfont}]
 
-% 编码器（左）
-\node (ein) at (0,0) {Inputs};
-\node[box] (emb1) at (0,0.52) {Input Embedding};
-\node[op]  (p1)   at (0,1.04) {};
-\node[box] (mha1) at (0,1.56) {Multi-Head Attention};
-\node[box] (an1)  at (0,2.08) {Add \& Norm};
-\node[box] (ff1)  at (0,2.60) {Feed Forward};
-\node[box] (an2)  at (0,3.12) {Add \& Norm};
+% ================= 编码器 =================
+\node[lab] (ein) at (0,0) {Inputs};
+\node[box] (emb1) at (0,0.50) {Input Embedding};
+\node[op]  (p1)   at (0,1.00) {};
+\node[box] (mha1) at (0,1.50) {Multi-Head Attention};
+\node[box] (an1)  at (0,2.00) {Add \& Norm};
+\node[box] (ff1)  at (0,2.50) {Feed Forward};
+\node[box] (an2)  at (0,3.00) {Add \& Norm};
 
 \draw[ar] (ein) -- (emb1);
 \draw[ar] (emb1) -- (p1);
@@ -291,27 +293,27 @@
 \draw[ar] (an1) -- (ff1);
 \draw[ar] (ff1) -- (an2);
 
-\node[anchor=east, align=center, font=\fontsize{4.8}{5.6}\selectfont] at (-1.32,1.04) {Positional\\Encoding};
-\draw[ar] (-1.32,0.86) -- (-1.32,0.72) -| (p1.west);
+\node[lab, anchor=east, align=center] at (-1.78,0.98) {Positional\\Encoding};
+\draw[ar] (-1.78,0.82) -- (-1.78,0.68) -| (p1.west);
 
-\draw[res] (-0.98,1.30) -- (-0.98,2.08) -- (an1.west);
-\draw[res] (-0.98,2.34) -- (-0.98,3.12) -- (an2.west);
-\draw[draw=scutblue!45, rounded corners=3pt] (-1.14,1.36) rectangle (-1.04,3.30);
-\node[font=\fontsize{5.6}{6.4}\selectfont, text=scutblue!70] at (-1.44,2.33) {$N\times$};
+\draw[res] (-1.14,1.25) -- (-1.14,2.00) -- (an1.west);
+\draw[res] (-1.14,2.25) -- (-1.14,3.00) -- (an2.west);
+\draw[draw=scutblue!45, rounded corners=3pt] (-1.33,1.31) rectangle (-1.25,3.19);
+\node[font=\fontsize{5.2}{6}\selectfont, text=scutblue!70] at (-1.55,2.25) {$N\times$};
 
-% 解码器（右）
-\node[align=center] (din) at (4.7,0) {Outputs\\(shifted right)};
-\node[box] (emb2) at (4.7,0.55) {Output Embedding};
-\node[op]  (p2)   at (4.7,1.07) {};
-\node[box, minimum height=0.5cm] (mha2) at (4.7,1.66) {Masked Multi-Head\\Attention};
-\node[box] (an3)  at (4.7,2.26) {Add \& Norm};
-\node[box] (mha3) at (4.7,2.78) {Multi-Head Attention};
-\node[box] (an4)  at (4.7,3.30) {Add \& Norm};
-\node[box] (ff2)  at (4.7,3.82) {Feed Forward};
-\node[box] (an5)  at (4.7,4.34) {Add \& Norm};
-\node[box] (lin)  at (4.7,4.86) {Linear};
-\node[box] (smax) at (4.7,5.38) {Softmax};
-\node[align=center] (dout) at (4.7,5.98) {Output\\Probabilities};
+% ================= 解码器 =================
+\node[lab, align=center] (din) at (4.4,-0.05) {Outputs\\(shifted right)};
+\node[box] (emb2) at (4.4,0.52) {Output Embedding};
+\node[op]  (p2)   at (4.4,1.02) {};
+\node[box2] (mha2) at (4.4,1.60) {Masked Multi-Head\\Attention};
+\node[box] (an3)  at (4.4,2.16) {Add \& Norm};
+\node[box] (mha3) at (4.4,2.66) {Multi-Head Attention};
+\node[box] (an4)  at (4.4,3.16) {Add \& Norm};
+\node[box] (ff2)  at (4.4,3.66) {Feed Forward};
+\node[box] (an5)  at (4.4,4.16) {Add \& Norm};
+\node[box] (lin)  at (4.4,4.66) {Linear};
+\node[box] (smax) at (4.4,5.16) {Softmax};
+\node[lab, align=center] (dout) at (4.4,5.72) {Output\\Probabilities};
 
 \draw[ar] (din) -- (emb2);
 \draw[ar] (emb2) -- (p2);
@@ -325,17 +327,17 @@
 \draw[ar] (lin) -- (smax);
 \draw[ar] (smax) -- (dout);
 
-\node[anchor=west, align=center, font=\fontsize{4.8}{5.6}\selectfont] at (5.95,1.07) {Positional\\Encoding};
-\draw[ar] (5.95,0.89) -- (5.95,0.75) -| (p2.east);
+\node[lab, anchor=west, align=center] at (6.12,0.98) {Positional\\Encoding};
+\draw[ar] (6.12,0.82) -- (6.12,0.68) -| (p2.east);
 
-\draw[res] (5.65,1.33) -- (5.65,2.26) -- (an3.east);
-\draw[res] (5.65,2.52) -- (5.65,3.30) -- (an4.east);
-\draw[res] (5.65,3.56) -- (5.65,4.34) -- (an5.east);
-\draw[draw=scutblue!45, rounded corners=3pt] (5.75,1.39) rectangle (5.87,4.52);
-\node[font=\fontsize{5.6}{6.4}\selectfont, text=scutblue!70] at (6.12,2.95) {$N\times$};
+\draw[res] (5.54,1.28) -- (5.54,2.16) -- (an3.east);
+\draw[res] (5.54,2.41) -- (5.54,3.16) -- (an4.east);
+\draw[res] (5.54,3.41) -- (5.54,4.16) -- (an5.east);
+\draw[draw=scutblue!45, rounded corners=3pt] (5.73,1.34) rectangle (5.81,4.35);
+\node[font=\fontsize{5.2}{6}\selectfont, text=scutblue!70] at (6.03,2.85) {$N\times$};
 
 % 编码器 -> 解码器
-\draw[ar, draw=scutgold!90] (an2.east) -- (2.35,3.12) -- (2.35,2.78) -- (mha3.west);
+\draw[ar, draw=scutgold!90] (an2.east) -- (2.60,3.00) -- (2.60,2.66) -- (mha3.west);
 
 \end{tikzpicture}
 
