@@ -42,7 +42,7 @@
         华南理工大学%
       \end{beamercolorbox}%
       \begin{beamercolorbox}[wd=.4\paperwidth,ht=2.25ex,dp=1ex,center]{subsection in foot}%
-        \insertshorttitle%
+        基于人工智能的无人机单目深度测距：误差研究与设计学分析%
       \end{beamercolorbox}%
       \begin{beamercolorbox}[wd=.3\paperwidth,ht=2.25ex,dp=1ex,right]{section in foot}%
         \insertframenumber{} / \inserttotalframenumber\hspace*{2ex}%
@@ -119,14 +119,14 @@
 
 {\footnotesize
 \begin{itemize}\setlength{\itemsep}{1pt}
-    \item 行业不是二选一：美团第四代集成 14 个感知单元，双目相机、4D 毫米波雷达与前向激光雷达并用，感知 0.7 至 40 米
-    \item 激光雷达长在测距：主动发射激光测回波，不依赖环境纹理，也不受光照限制
-    \item 短在分类与玻璃：三十米外的点云只给出轮廓，电线、飞鸟、外挂广告牌分不开，三者的避让策略不同；幕墙镜面反射，回波不返回
+    \item 行业并不是只用视觉或者只用激光雷达。美团第四代集成 14 个感知单元，双目相机、4D 毫米波雷达与前向激光雷达并用，感知 0.7 至 40 米
+    \item 激光雷达优势在于测距：主动发射激光测回波，不依赖环境纹理，也不受光照限制
+    \item 缺点例如：三十米外的点云只给出轮廓，电线、飞鸟、外挂广告牌分不开，三者的避让策略不同；幕墙镜面反射，回波不返回
     \item 还有成本与载荷：机械式曾单价数万美元，载荷每增一克都折损续航，感知成本要乘机队规模
 \end{itemize}}
 
 \vspace{0.3cm}
-{\small 本文的对象是成本敏感航线上只配一台前视相机的机型，它同时也是高端机型在激光雷达故障或雨雾衰减后的降级形态。\textbf{要回答的是：退到单目，九米判据还能不能撑住。}}
+{\small 本文的对象是成本敏感航线上只配一台前视相机的机型，它同时也是高端机型在激光雷达故障或雨雾衰减后的降级形态。}
 
 \src{Liang Y, Deng B, Liu W, Qin J, He S. Monocular Depth Estimation for Glass Walls With Context. IEEE TPAMI, 2023.}
 \end{frame}
@@ -136,7 +136,7 @@
 
 \begin{itemize}
     \item 平台：Unreal Engine 4 的 AirSim，场景为 CityEnviron 城市峡谷
-    \item 采集 422 个航段、75,194 帧；按深度范围 0.5 至 80 米、帧有效率 50\% 清洗，保留 48,767 帧
+    \item 采集 422 个航段、75,194 帧；按深度范围 0.5 至 80 米、进行数据清洗，保留 48,767 帧
     \item 真值由渲染引擎直接输出，与图像逐像素对齐，单位是米
     \item 划分按航段切：训练 375 段、验证 14 段、测试 15 段，留出集 3,326 帧
     \item 训练标签取\textbf{视差} $1/d$，即距离的倒数，近处差异被放大
@@ -155,10 +155,9 @@
 \begin{frame}{卷积神经网络}
 
 \begin{itemize}
-    \item 图像是数值网格，192$\times$108 共六万多个数。全连接层参数比数据还多，必须先压缩连接
+    \item 图像是数值网格，192$\times$108 
     \item 卷积核是一个小窗口，通常 3$\times$3，在整幅图上滑动，权重不变，这叫权值共享
     \item 一个核相当于一个局部模式检测器：竖直边缘、横向边缘、某个方向的纹理
-    \item 堆叠之后，浅层响应边缘，深层把边缘组合成角、轮廓、部件
     \item 池化层降分辨率，同时扩大感受野，让后面的核看到更大的原图范围
 \end{itemize}
 
@@ -268,50 +267,79 @@
 %--------------------------------------------------------------
 \begin{frame}{Transformer}
 
-{\footnotesize
-\begin{itemize}\setlength{\itemsep}{0.5pt}
-    \item 为机器翻译提出：输入一句，输出另一句，整句一次算完，不像循环网络那样逐词推进
-    \item 编码器与解码器各叠若干层，每层两个子层：自注意力与前馈网络，各带残差与层归一化
-    \item 自注意力让每个词与句中所有词算相关性，再按相关性加权求和；多头并行，各看一种关系
-    \item 词序不由结构隐含，改由位置编码显式给出
-\end{itemize}}
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm, >=Latex, font=\fontsize{5.2}{6.0}\selectfont,
+  box/.style={draw=scutblue!70, fill=scutblue!6, rounded corners=1.2pt, align=center,
+              inner sep=0.8pt, minimum width=2.2cm, minimum height=0.40cm},
+  op/.style={circle, draw=scutgold!90, fill=scutgold!25, inner sep=0.15pt},
+  ar/.style={->, draw=scutblue!70, semithick},
+  res/.style={->, draw=scutblue!45, thin}]
 
-\vspace{0.1cm}
-\begin{center}
-\begin{tikzpicture}[font=\small, node distance=4.6mm,
-  blk/.style={draw=scutblue!65, fill=scutblue!6, rounded corners=2pt, align=center,
-              inner sep=2.4pt, minimum height=8mm},
-  qk/.style={draw=scutsky!75, fill=scutsky!8, rounded corners=2pt, align=center,
-             inner sep=2.4pt, minimum height=8mm},
-  ar/.style={-{Latex[length=1.1mm]}, draw=scutblue!55, semithick}]
+% 编码器（左）
+\node (ein) at (0,0) {Inputs};
+\node[box] (emb1) at (0,0.52) {Input Embedding};
+\node[op]  (p1)   at (0,1.04) {};
+\node[box] (mha1) at (0,1.56) {Multi-Head Attention};
+\node[box] (an1)  at (0,2.08) {Add \& Norm};
+\node[box] (ff1)  at (0,2.60) {Feed Forward};
+\node[box] (an2)  at (0,3.12) {Add \& Norm};
 
-\node[blk] (src) {输入序列};
-\node[blk, right=of src] (emb) {词向量 + 位置编码};
-\node[blk, right=of emb] (enc) {编码器 $\times N$};
-\node[blk, right=of enc] (dec) {解码器 $\times N$};
-\node[blk, right=of dec] (out) {输出序列};
+\draw[ar] (ein) -- (emb1);
+\draw[ar] (emb1) -- (p1);
+\draw[ar] (p1) -- (mha1);
+\draw[ar] (mha1) -- (an1);
+\draw[ar] (an1) -- (ff1);
+\draw[ar] (ff1) -- (an2);
 
-\draw[ar] (src) -- (emb);
-\draw[ar] (emb) -- (enc);
-\draw[ar] (enc) -- (dec);
-\draw[ar] (dec) -- (out);
+\node[anchor=east, align=center, font=\fontsize{4.8}{5.6}\selectfont] at (-1.32,1.04) {Positional\\Encoding};
+\draw[ar] (-1.32,0.86) -- (-1.32,0.72) -| (p1.west);
 
-\node[qk, anchor=west] (q) at ([yshift=-11mm]emb.south west) {查询 $q$};
-\node[qk, right=of q] (k) {与所有键点积};
-\node[qk, right=of k] (sm) {softmax 归一化};
-\node[qk, right=of sm] (v) {对值加权求和};
+\draw[res] (-0.98,1.30) -- (-0.98,2.08) -- (an1.west);
+\draw[res] (-0.98,2.34) -- (-0.98,3.12) -- (an2.west);
+\draw[draw=scutblue!45, rounded corners=3pt] (-1.14,1.36) rectangle (-1.04,3.30);
+\node[font=\fontsize{5.6}{6.4}\selectfont, text=scutblue!70] at (-1.44,2.33) {$N\times$};
 
-\draw[ar] (q) -- (k);
-\draw[ar] (k) -- (sm);
-\draw[ar] (sm) -- (v);
+% 解码器（右）
+\node[align=center] (din) at (4.7,0) {Outputs\\(shifted right)};
+\node[box] (emb2) at (4.7,0.55) {Output Embedding};
+\node[op]  (p2)   at (4.7,1.07) {};
+\node[box, minimum height=0.5cm] (mha2) at (4.7,1.66) {Masked Multi-Head\\Attention};
+\node[box] (an3)  at (4.7,2.26) {Add \& Norm};
+\node[box] (mha3) at (4.7,2.78) {Multi-Head Attention};
+\node[box] (an4)  at (4.7,3.30) {Add \& Norm};
+\node[box] (ff2)  at (4.7,3.82) {Feed Forward};
+\node[box] (an5)  at (4.7,4.34) {Add \& Norm};
+\node[box] (lin)  at (4.7,4.86) {Linear};
+\node[box] (smax) at (4.7,5.38) {Softmax};
+\node[align=center] (dout) at (4.7,5.98) {Output\\Probabilities};
+
+\draw[ar] (din) -- (emb2);
+\draw[ar] (emb2) -- (p2);
+\draw[ar] (p2) -- (mha2);
+\draw[ar] (mha2) -- (an3);
+\draw[ar] (an3) -- (mha3);
+\draw[ar] (mha3) -- (an4);
+\draw[ar] (an4) -- (ff2);
+\draw[ar] (ff2) -- (an5);
+\draw[ar] (an5) -- (lin);
+\draw[ar] (lin) -- (smax);
+\draw[ar] (smax) -- (dout);
+
+\node[anchor=west, align=center, font=\fontsize{4.8}{5.6}\selectfont] at (5.95,1.07) {Positional\\Encoding};
+\draw[ar] (5.95,0.89) -- (5.95,0.75) -| (p2.east);
+
+\draw[res] (5.65,1.33) -- (5.65,2.26) -- (an3.east);
+\draw[res] (5.65,2.52) -- (5.65,3.30) -- (an4.east);
+\draw[res] (5.65,3.56) -- (5.65,4.34) -- (an5.east);
+\draw[draw=scutblue!45, rounded corners=3pt] (5.75,1.39) rectangle (5.87,4.52);
+\node[font=\fontsize{5.6}{6.4}\selectfont, text=scutblue!70] at (6.12,2.95) {$N\times$};
+
+% 编码器 -> 解码器
+\draw[ar, draw=scutgold!90] (an2.east) -- (2.35,3.12) -- (2.35,2.78) -- (mha3.west);
 
 \end{tikzpicture}
 
-\vspace{0.12cm}
-{\scriptsize 上：编码器与解码器的数据流。下：自注意力的四步，每个位置与所有位置各算一次相关性。}
-\end{center}
-
-\src{Vaswani A, et al. Attention Is All You Need. NIPS, 2017.}
+{\scriptsize 图源：Vaswani 等，2017，Figure 1。编码器读整句，解码器逐词生成。}
 \end{frame}
 
 %--------------------------------------------------------------
